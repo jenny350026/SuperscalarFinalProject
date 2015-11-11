@@ -807,6 +807,7 @@ void scheduler_unit::cycle()
     bool issued_inst = false; // of these we issued one
 
     order_warps();
+	printf("m_supervised_warps size %d\n", m_supervised_warps.size());
     for ( std::vector< shd_warp_t* >::const_iterator iter = m_next_cycle_prioritized_warps.begin();
           iter != m_next_cycle_prioritized_warps.end();
           iter++ ) {
@@ -908,6 +909,7 @@ void scheduler_unit::cycle()
     }
 
     // issue stall statistics:
+	//TODO 
     if( !valid_inst ) 
         m_stats->shader_cycle_distro[0]++; // idle or control hazard
     else if( !ready_inst ) 
