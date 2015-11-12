@@ -799,6 +799,10 @@ void scheduler_unit::order_by_priority( std::vector< T >& result_list,
     }
 }
 
+long n_cyc_tot = 0;
+long n_cyc_idle = 0;
+long n_cyc_issue = 0;
+
 void scheduler_unit::cycle()
 {
     SCHED_DPRINTF( "scheduler_unit::cycle()\n" );
@@ -807,7 +811,7 @@ void scheduler_unit::cycle()
     bool issued_inst = false; // of these we issued one
 
     order_warps();
-	printf("m_supervised_warps size %d\n", m_supervised_warps.size());
+	//printf("m_supervised_warps size %d\n", m_supervised_warps.size());
     for ( std::vector< shd_warp_t* >::const_iterator iter = m_next_cycle_prioritized_warps.begin();
           iter != m_next_cycle_prioritized_warps.end();
           iter++ ) {
@@ -904,18 +908,28 @@ void scheduler_unit::cycle()
                     m_last_supervised_issued = supervised_iter;
                 }
             }
+	    n_cyc_issue++;
             break;
         } 
     }
 
     // issue stall statistics:
-	//TODO 
-    if( !valid_inst ) 
+	//TODO
+	n_cyc_tot++; 
+    if( !valid_inst ) {
         m_stats->shader_cycle_distro[0]++; // idle or control hazard
-    else if( !ready_inst ) 
+	n_cyc_idle++;
+	}
+    else if( !ready_inst ) {
         m_stats->shader_cycle_distro[1]++; // waiting for RAW hazards (possibly due to memory) 
-    else if( !issued_inst ) 
+	n_cyc_idle++;
+	}
+    else if( !issued_inst ) {
         m_stats->shader_cycle_distro[2]++; // pipeline stalled
+	n_cyc_idle++;
+	}
+	if(n_cyc_tot%100==0)
+	printf("n_cyc_tot, n_cyc_idle, n_cyc_issue = (%d, %d, %d)\n", n_cyc_tot, n_cyc_idle, n_cyc_issue);
 }
 
 void scheduler_unit::do_on_warp_issued( unsigned warp_id,
