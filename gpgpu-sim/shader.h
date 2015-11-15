@@ -94,6 +94,21 @@ public:
         m_inst_in_pipeline=0;
         reset(); 
     }
+
+    //TODO copy constructor copy all fields from rhs.
+    //May not even need this copy constructor since C++ built-in copy constructor copies everything by default, and we don't need any deep copies of pointer variables
+    shd_warp_t(const shd_warp_t& rhs){
+
+    }
+
+    //TODO need a function to change m_active_threads after splitting
+
+    //TODO need a function to change m_dynamic_warp_id after splitting
+
+    //TODO also need a new warp_id...
+
+    //TODO other fields that needs to be changed...?
+
     void reset()
     {
         assert( m_stores_outstanding==0);
@@ -237,7 +252,7 @@ private:
 
     address_type m_next_pc;
     unsigned n_completed;          // number of threads in warp completed
-    std::bitset<MAX_WARP_SIZE> m_active_threads;
+    std::bitset<MAX_WARP_SIZE> m_active_threads; //NOTE should change on split
 
     bool m_imiss_pending;
     
@@ -247,7 +262,7 @@ private:
        bool m_valid;
     };
 
-    const warp_inst_t *m_inst_at_barrier;
+    const warp_inst_t *m_inst_at_barrier; //NOTE MAY not need to change
     ibuffer_entry m_ibuffer[IBUFFER_SIZE]; 
     unsigned m_next;
                                    

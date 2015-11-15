@@ -119,6 +119,7 @@ shader_core_ctx::shader_core_ctx( class gpgpu_sim *gpu,
     snprintf(name, STRSIZE, "L1I_%03d", m_sid);
     m_L1I = new read_only_cache( name,m_config->m_L1I_config,m_sid,get_shader_instruction_cache_id(),m_icnt,IN_L1I_MISS_QUEUE);
     
+    //NOTE m_warp can already hold max number of warp a shader can support, just need to enable next warp if a new warp is needed
     m_warp.resize(m_config->max_warps_per_shader, shd_warp_t(this, warp_size));
     m_scoreboard = new Scoreboard(m_sid, m_config->max_warps_per_shader);
     
@@ -204,9 +205,11 @@ shader_core_ctx::shader_core_ctx( class gpgpu_sim *gpu,
     
     for (unsigned i = 0; i < m_warp.size(); i++) {
         //distribute i's evenly though schedulers;
+        //NOTE need to add new warp to supervised warp
         schedulers[i%m_config->gpgpu_num_sched_per_core]->add_supervised_warp_id(i);
     }
     for ( int i = 0; i < m_config->gpgpu_num_sched_per_core; ++i ) {
+        //NOTE we may have to call this after we add new warp to scheduler?
         schedulers[i]->done_adding_supervised_warps();
     }
     
@@ -309,10 +312,12 @@ void shader_core_ctx::reinit(unsigned start_thread, unsigned end_thread, bool re
       m_threadState[i].m_cta_id = -1;
    }
    for (unsigned i = start_thread / m_config->warp_size; i < end_thread / m_config->warp_size; ++i) {
+      //NOTE need to find out where reinit is called to see if calling reset will break warp splits, also the loop here doesn't account for new warp added to m_warp
       m_warp[i].reset();
       m_simt_stack[i]->reset();
    }
 }
+
 
 void shader_core_ctx::init_warps( unsigned cta_id, unsigned start_thread, unsigned end_thread )
 {
@@ -335,6 +340,7 @@ void shader_core_ctx::init_warps( unsigned cta_id, unsigned start_thread, unsign
             m_simt_stack[i]->launch(start_pc,active_threads);
             m_warp[i].init(start_pc,cta_id,i,active_threads, m_dynamic_warp_id);
             ++m_dynamic_warp_id;
+            //NOTE may be able to use m_dynamic_warp_id for new splits
             m_not_completed += n_active;
       }
    }
@@ -568,6 +574,7 @@ void shader_core_ctx::decode()
         // decode 1 or 2 instructions and place them into ibuffer
         address_type pc = m_inst_fetch_buffer.m_pc;
         const warp_inst_t* pI1 = ptx_fetch_inst(pc);
+        // NOTE need to make sure m_inst_fetch_buffer.m_warp_id is aware of the new warp added
         m_warp[m_inst_fetch_buffer.m_warp_id].ibuffer_fill(0,pI1);
         m_warp[m_inst_fetch_buffer.m_warp_id].inc_inst_in_pipeline();
         if( pI1 ) {
@@ -599,6 +606,7 @@ void shader_core_ctx::fetch()
         // find an active warp with space in instruction buffer that is not already waiting on a cache miss
         // and get next 1-2 instructions from i-cache...
         for( unsigned i=0; i < m_config->max_warps_per_shader; i++ ) {
+            // NOTE this warp_id SHOULD somehow get the id of the new warp added?
             unsigned warp_id = (m_last_warp_fetched+1+i) % m_config->max_warps_per_shader;
 
             // this code checks if this warp has finished executing and can be reclaimed
@@ -664,6 +672,7 @@ void shader_core_ctx::fetch()
 
     if( m_L1I->access_ready() ) {
         mem_fetch *mf = m_L1I->next_access();
+        // NOTE this is problematic... if insturction missed before the split, how do we make sure to tell both warps to clear_imiss_pending()
         m_warp[mf->get_wid()].clear_imiss_pending();
         delete mf;
     }
@@ -918,18 +927,18 @@ void scheduler_unit::cycle()
 	n_cyc_tot++; 
     if( !valid_inst ) {
         m_stats->shader_cycle_distro[0]++; // idle or control hazard
-	n_cyc_idle++;
+	    n_cyc_idle++;
 	}
     else if( !ready_inst ) {
         m_stats->shader_cycle_distro[1]++; // waiting for RAW hazards (possibly due to memory) 
-	n_cyc_idle++;
+	    n_cyc_idle++;
 	}
     else if( !issued_inst ) {
         m_stats->shader_cycle_distro[2]++; // pipeline stalled
-	n_cyc_idle++;
+	    n_cyc_idle++;
 	}
 	if(n_cyc_tot%100==0)
-	printf("n_cyc_tot, n_cyc_idle, n_cyc_issue = (%d, %d, %d)\n", n_cyc_tot, n_cyc_idle, n_cyc_issue);
+	    printf("n_cyc_tot, n_cyc_idle, n_cyc_issue = (%d, %d, %d)\n", n_cyc_tot, n_cyc_idle, n_cyc_issue);
 }
 
 void scheduler_unit::do_on_warp_issued( unsigned warp_id,
@@ -1269,7 +1278,7 @@ void shader_core_ctx::writeback()
     	 * To handle this case, we ignore the return value (thus allowing
     	 * no stalling).
     	 */
-
+        // NOTE need to figure out what this part is doing and see if warp_id needs to be changed
         m_operand_collector.writeback(*pipe_reg);
         unsigned warp_id = pipe_reg->warp_id();
         m_scoreboard->releaseRegisters( pipe_reg );
@@ -1314,6 +1323,7 @@ ldst_unit::process_cache_access( cache_t* cache,
     mem_stage_stall_type result = NO_RC_FAIL;
     bool write_sent = was_write_sent(events);
     bool read_sent = was_read_sent(events);
+    //NOTE warp_instr_t (instruction) also has a warp id??
     if( write_sent ) 
         m_core->inc_store_req( inst.warp_id() );
     if ( status == HIT ) {
@@ -2286,6 +2296,8 @@ void ldst_unit::print(FILE *fout) const
                   m_last_inst_gpu_sim_cycle, m_last_inst_gpu_tot_sim_cycle );
     fprintf(fout,"Pending register writes:\n");
     std::map<unsigned/*warp_id*/, std::map<unsigned/*regnum*/,unsigned/*count*/> >::const_iterator w;
+    //NOTE what's in pending_writes? may need to make sure warp id is correct
+    //NOTE may also run into the same problem as instruction miss. If a warp has pending loads before warp is splitted, how to make sure both gets updated
     for( w=m_pending_writes.begin(); w!=m_pending_writes.end(); w++ ) {
         unsigned warp_id = w->first;
         const std::map<unsigned/*regnum*/,unsigned/*count*/> &warp_info = w->second;
@@ -2555,6 +2567,8 @@ std::list<opndcoll_rfu_t::op_t> opndcoll_rfu_t::arbiter_t::allocate_reads()
    return result;
 }
 
+//TODO need to make sure the new warp is added to the barrier...
+
 barrier_set_t::barrier_set_t(shader_core_ctx *shader,unsigned max_warps_per_core, unsigned max_cta_per_core, unsigned max_barriers_per_cta, unsigned warp_size)
 {
    m_max_warps_per_core = max_warps_per_core;
@@ -2720,6 +2734,8 @@ void barrier_set_t::dump()
    fflush(stdout); 
 }
 
+
+// NOTE anything needs to be changed in beyond this line? scoreboard, more?
 void shader_core_ctx::warp_exit( unsigned warp_id )
 {
 	bool done = true;
