@@ -97,15 +97,31 @@ public:
 
     //TODO copy constructor copy all fields from rhs.
     //May not even need this copy constructor since C++ built-in copy constructor copies everything by default, and we don't need any deep copies of pointer variables
+
     shd_warp_t(const shd_warp_t& rhs){
 
     }
 
+    shd_warp_t& operator=(const shd_warp_t& other){
+
+    }
+
     //TODO need a function to change m_active_threads after splitting
+    void set_active_threads(std::bitset<MAX_THREAD_PER_SM> new_mask){
+        m_active_threads.reset();
+        //m_active_threads |= new_mask;
+    } 
 
     //TODO need a function to change m_dynamic_warp_id after splitting
+    void set_dynamic_warp_id(unsigned i){
+        m_dynamic_warp_id = i;
+    }
 
     //TODO also need a new warp_id...
+    
+    void set_warp_id(unsigned i){
+        m_warp_id = i;
+    }
 
     //TODO other fields that needs to be changed...?
 
@@ -246,9 +262,9 @@ private:
     static const unsigned IBUFFER_SIZE=2;
     class shader_core_ctx *m_shader;
     unsigned m_cta_id;
-    unsigned m_warp_id;
+    unsigned m_warp_id; //NOTE should change on split
     unsigned m_warp_size;
-    unsigned m_dynamic_warp_id;
+    unsigned m_dynamic_warp_id; //NOTE should change on split
 
     address_type m_next_pc;
     unsigned n_completed;          // number of threads in warp completed
@@ -1846,6 +1862,9 @@ public:
     // is that the dynamic_warp_id is a running number unique to every warp
     // run on this shader, where the warp_id is the static warp slot.
     unsigned m_dynamic_warp_id;
+
+    // for warp splits
+    unsigned m_last_warp_id;
 };
 
 class simt_core_cluster {

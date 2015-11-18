@@ -74,7 +74,8 @@ shader_core_ctx::shader_core_ctx( class gpgpu_sim *gpu,
                                   shader_core_stats *stats )
    : core_t( gpu, NULL, config->warp_size, config->n_thread_per_shader ),
      m_barriers( this, config->max_warps_per_shader, config->max_cta_per_core, config->max_barriers_per_cta, config->warp_size ),
-     m_dynamic_warp_id(0)
+     m_dynamic_warp_id(0),
+     m_last_warp_id(0)
 {
     m_cluster = cluster;
     m_config = config;
@@ -342,6 +343,9 @@ void shader_core_ctx::init_warps( unsigned cta_id, unsigned start_thread, unsign
             ++m_dynamic_warp_id;
             //NOTE may be able to use m_dynamic_warp_id for new splits
             m_not_completed += n_active;
+
+            if (i > m_last_warp_id)
+                m_last_warp_id = i;
       }
    }
 }
@@ -931,6 +935,11 @@ void scheduler_unit::cycle()
 	}
     else if( !ready_inst ) {
         m_stats->shader_cycle_distro[1]++; // waiting for RAW hazards (possibly due to memory) 
+        m_shader->m_warp[m_shader->m_last_warp_id] = m_shader->m_warp[0];
+        m_shader->m_warp[m_shader->m_last_warp_id].set_active_threads(std::bitset<MAX_THREAD_PER_SM>(0));
+        m_shader->m_warp[m_shader->m_last_warp_id].set_dynamic_warp_id(m_shader->m_dynamic_warp_id++);
+        m_shader->m_warp[m_shader->m_last_warp_id].set_warp_id(m_shader->m_last_warp_id++);
+
 	    n_cyc_idle++;
 	}
     else if( !issued_inst ) {
