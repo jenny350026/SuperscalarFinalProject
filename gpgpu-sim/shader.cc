@@ -935,19 +935,21 @@ void scheduler_unit::cycle()
 	}
     else if( !ready_inst ) {
         m_stats->shader_cycle_distro[1]++; // waiting for RAW hazards (possibly due to memory) 
-        m_shader->m_warp[m_shader->m_last_warp_id] = m_shader->m_warp[0];
-        m_shader->m_warp[m_shader->m_last_warp_id].set_active_threads(std::bitset<MAX_THREAD_PER_SM>(0));
-        m_shader->m_warp[m_shader->m_last_warp_id].set_dynamic_warp_id(m_shader->m_dynamic_warp_id++);
-        m_shader->m_warp[m_shader->m_last_warp_id].set_warp_id(m_shader->m_last_warp_id++);
-
+        if(m_shader->m_last_warp_id<m_shader->m_config->max_warps_per_shader-1)
+	{
+		m_shader->m_warp[m_shader->m_last_warp_id] = m_shader->m_warp[0];
+	        m_shader->m_warp[m_shader->m_last_warp_id].set_active_threads(std::bitset<MAX_THREAD_PER_SM>(0));
+	        m_shader->m_warp[m_shader->m_last_warp_id].set_dynamic_warp_id(m_shader->m_dynamic_warp_id++);
+	        m_shader->m_warp[m_shader->m_last_warp_id].set_warp_id(m_shader->m_last_warp_id++);
+	}
 	    n_cyc_idle++;
 	}
     else if( !issued_inst ) {
         m_stats->shader_cycle_distro[2]++; // pipeline stalled
 	    n_cyc_idle++;
 	}
-	if(n_cyc_tot%100==0)
-	    printf("n_cyc_tot, n_cyc_idle, n_cyc_issue = (%d, %d, %d)\n", n_cyc_tot, n_cyc_idle, n_cyc_issue);
+	//if(n_cyc_tot%100==0)
+	  //  printf("n_cyc_tot, n_cyc_idle, n_cyc_issue = (%d, %d, %d)\n", n_cyc_tot, n_cyc_idle, n_cyc_issue);
 }
 
 void scheduler_unit::do_on_warp_issued( unsigned warp_id,
