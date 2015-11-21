@@ -98,13 +98,13 @@ public:
     //TODO copy constructor copy all fields from rhs.
     //May not even need this copy constructor since C++ built-in copy constructor copies everything by default, and we don't need any deep copies of pointer variables
 
-    shd_warp_t(const shd_warp_t& rhs){
+   // shd_warp_t(const shd_warp_t& rhs){
 
-    }
+   // }
 
-    shd_warp_t& operator=(const shd_warp_t& other){
+   // shd_warp_t& operator=(const shd_warp_t& other){
 
-    }
+   // }
 
     //TODO need a function to change m_active_threads after splitting
     void set_active_threads(std::bitset<MAX_THREAD_PER_SM> new_mask){
