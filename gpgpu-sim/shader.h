@@ -102,14 +102,14 @@ public:
 
     }
 
-    shd_warp_t& operator=(const shd_warp_t& other){
+    //shd_warp_t& operator=(const shd_warp_t& other){
 
-    }
+    //}
 
     //TODO need a function to change m_active_threads after splitting
-    void set_active_threads(std::bitset<MAX_THREAD_PER_SM> new_mask){
+    void set_active_threads(std::bitset<MAX_WARP_SIZE> new_mask){
         m_active_threads.reset();
-        //m_active_threads |= new_mask;
+        m_active_threads |= new_mask;
     } 
 
     //TODO need a function to change m_dynamic_warp_id after splitting
