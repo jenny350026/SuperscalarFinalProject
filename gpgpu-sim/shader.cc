@@ -939,7 +939,7 @@ void scheduler_unit::cycle()
         m_warpsplit[m_warpsplit.size() - 1].set_active_threads(std::bitset<MAX_WARP_SIZE>(0));
 	    m_warpsplit[m_warpsplit.size() - 1].set_dynamic_warp_id(m_shader->m_dynamic_warp_id++);
 	    m_warpsplit[m_warpsplit.size() - 1].set_warp_id(m_shader->m_last_warp_id++);
-	    m_shader->m_warp[0].set_active_threads(std::bitset<MAX_WARP_SIZE>(0));
+	    //m_shader->m_warp[0].set_active_threads(std::bitset<MAX_WARP_SIZE>(0));
         // if(m_shader->m_last_warp_id<m_shader->m_config->max_warps_per_shader-1)
 	    // {
 		//     m_shader->m_warp[m_shader->m_last_warp_id] = m_shader->m_warp[0];
