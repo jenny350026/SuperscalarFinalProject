@@ -411,7 +411,7 @@ protected:
     simt_stack** m_simt_stack;
     //warp_inst_t** m_pipeline_reg;
     std::vector<shd_warp_t>* m_warp;
-    std::vector<shd_warp_t>* m_warpsplit;
+    std::vector<shd_warp_t> m_warpsplit;
     register_set* m_sp_out;
     register_set* m_sfu_out;
     register_set* m_mem_out;
