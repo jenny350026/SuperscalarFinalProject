@@ -346,7 +346,7 @@ public:
         m_supervised_warps.push_back(&warp(i));
     }
     virtual void done_adding_supervised_warps() {
-        m_last_supervised_issued = m_supervised_warps.end();
+        m_last_supervised_issued = m_superised_warps.end();
     }
 
 
