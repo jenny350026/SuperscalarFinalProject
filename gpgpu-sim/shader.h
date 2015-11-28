@@ -170,7 +170,7 @@ public:
     unsigned get_n_completed() const { return n_completed; }
     void set_completed( unsigned lane ) 
     { 
-        assert( m_active_threads.test(lane) );
+        //assert( m_active_threads.test(lane) );
         m_active_threads.reset(lane);
         n_completed++; 
     }
