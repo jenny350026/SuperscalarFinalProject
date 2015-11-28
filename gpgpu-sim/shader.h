@@ -339,7 +339,7 @@ public:
                    register_set* mem_out,
                    int id) 
         : m_supervised_warps(), m_stats(stats), m_shader(shader),
-        m_scoreboard(scoreboard), m_simt_stack(simt), /*m_pipeline_reg(pipe_regs),*/ m_warp(warp),
+        m_scoreboard(scoreboard), m_simt_stack(simt), /*m_pipeline_reg(pipe_regs),*/ m_warp(warp), m_warpsplit(),
         m_sp_out(sp_out),m_sfu_out(sfu_out),m_mem_out(mem_out), m_id(id){}
     virtual ~scheduler_unit(){}
     virtual void add_supervised_warp_id(int i) {
@@ -411,6 +411,7 @@ protected:
     simt_stack** m_simt_stack;
     //warp_inst_t** m_pipeline_reg;
     std::vector<shd_warp_t>* m_warp;
+    std::vector<shd_warp_t>* m_warpsplit;
     register_set* m_sp_out;
     register_set* m_sfu_out;
     register_set* m_mem_out;
