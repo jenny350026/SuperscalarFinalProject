@@ -935,13 +935,18 @@ void scheduler_unit::cycle()
 	}
     else if( !ready_inst ) {
         m_stats->shader_cycle_distro[1]++; // waiting for RAW hazards (possibly due to memory) 
-        if(m_shader->m_last_warp_id<m_shader->m_config->max_warps_per_shader-1)
-	{
-		m_shader->m_warp[m_shader->m_last_warp_id] = m_shader->m_warp[0];
-	        m_shader->m_warp[m_shader->m_last_warp_id].set_active_threads(std::bitset<MAX_THREAD_PER_SM>(0));
-	        m_shader->m_warp[m_shader->m_last_warp_id].set_dynamic_warp_id(m_shader->m_dynamic_warp_id++);
-	        m_shader->m_warp[m_shader->m_last_warp_id].set_warp_id(m_shader->m_last_warp_id++);
-	}
+        m_warpsplit.pushback(m_shader->m_warp[0]);
+        m_warpsplit[m_warpsplit.size() - 1].set_active_threads(std::bitset<MAX_THREAD_PER_SM>(0));
+	    m_warpsplit[m_warpsplit.size() - 1].set_dynamic_warp_id(m_shader->m_dynamic_warp_id++);
+	    m_warpsplit[m_warpsplit.size() - 1].set_warp_id(m_shader->m_last_warp_id++);
+	    m_shader->m_warp[0].set_active_threads(std::bitset<MAX_THREAD_PER_SM>(0));
+        // if(m_shader->m_last_warp_id<m_shader->m_config->max_warps_per_shader-1)
+	    // {
+		//     m_shader->m_warp[m_shader->m_last_warp_id] = m_shader->m_warp[0];
+	    //     m_shader->m_warp[m_shader->m_last_warp_id].set_active_threads(std::bitset<MAX_THREAD_PER_SM>(0));
+	    //     m_shader->m_warp[m_shader->m_last_warp_id].set_dynamic_warp_id(m_shader->m_dynamic_warp_id++);
+	    //     m_shader->m_warp[m_shader->m_last_warp_id].set_warp_id(m_shader->m_last_warp_id++);
+	    // }
 	    n_cyc_idle++;
 	}
     else if( !issued_inst ) {
