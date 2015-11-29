@@ -862,8 +862,12 @@ void scheduler_unit::cycle()
                                        (*iter)->get_warp_id(), (*iter)->get_dynamic_warp_id() );
                         ready_inst = true;
                         // TODO change active mask
-                        const active_mask_t &active_mask = m_simt_stack[warp_id]->get_active_mask() & (*iter)->get_active_threads();
+                        const active_mask_t &temp_active_mask = m_simt_stack[warp_id]->get_active_mask();
+
+                        active_mask_t active_mask = temp_active_mask;
                         if(m_warpsplit_table.matched(*iter)){
+                            active_mask = temp_active_mask & m_warpsplit_table.get_mask(*iter); 
+                            
                             std::cout << "simt mask " << m_simt_stack[warp_id]->get_active_mask() << std::endl;
                             std::cout << "warp mask " << (*iter)->get_active_threads() << std::endl;
                             std::cout << "final mask " << active_mask << std::endl;
