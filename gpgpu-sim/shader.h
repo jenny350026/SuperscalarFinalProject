@@ -345,6 +345,13 @@ public:
         return m_table.size();
     }
 
+    bool matched(shd_warp_t* warp){
+       for(int i = 0; i < m_table.size(); ++i)
+            if(warp == &m_table[i])
+                return true; 
+        return false;
+    }
+
 private:
     std::vector<shd_warp_t> m_table;
     std::vector<shd_warp_t*>* m_supervised_warps;
