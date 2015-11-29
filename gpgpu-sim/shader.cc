@@ -861,6 +861,7 @@ void scheduler_unit::cycle()
                         SCHED_DPRINTF( "Warp (warp_id %u, dynamic_warp_id %u) passes scoreboard\n",
                                        (*iter)->get_warp_id(), (*iter)->get_dynamic_warp_id() );
                         ready_inst = true;
+                        // TODO change active mask
                         const active_mask_t &active_mask = m_simt_stack[warp_id]->get_active_mask();
                         assert( warp(warp_id).inst_in_pipeline() );
                         if ( (pI->op == LOAD_OP) || (pI->op == STORE_OP) || (pI->op == MEMORY_BARRIER_OP) ) {
@@ -921,7 +922,9 @@ void scheduler_unit::cycle()
                     m_last_supervised_issued = supervised_iter;
                 }
             }
-	    n_cyc_issue++;
+          //  if(m_warpsplit.size()>0&&*iter == &m_warpsplit[0])
+            //    std::cout << "Run warpsplit" << std::endl;
+    	    n_cyc_issue++;
             break;
         } 
     }
@@ -937,13 +940,12 @@ void scheduler_unit::cycle()
         m_stats->shader_cycle_distro[1]++; // waiting for RAW hazards (possibly due to memory) 
         
         // TODO will have to pick the right warp to split
-        m_warpsplit.push_back(m_shader->m_warp[0]);
-        m_warpsplit[m_warpsplit.size() - 1].set_active_threads(std::bitset<MAX_WARP_SIZE>(3));
-	    m_warpsplit[m_warpsplit.size() - 1].set_dynamic_warp_id(m_shader->m_dynamic_warp_id++);
-
-        m_supervised_warps.push_back(&m_warpsplit[m_warpsplit.size() - 1]);
+        if(m_warpsplit_table.size() < m_warpsplit_table.MAX_SIZE ){
+        //    std::cout<<"Warp SPLIT!!!!" << std::endl; 
+            m_warpsplit_table.add_warpsplit(m_shader->m_warp[0], std::bitset<MAX_WARP_SIZE>(3), m_shader->m_dynamic_warp_id++);
+        }
 	    //m_warpsplit[m_warpsplit.size() - 1].set_warp_id(m_shader->m_last_warp_id++);
-	    //m_shader->m_warp[0].set_active_threads(std::bitset<MAX_WARP_SIZE>(0));
+	    m_shader->m_warp[0].set_active_threads(std::bitset<MAX_WARP_SIZE>(0));
         // if(m_shader->m_last_warp_id<m_shader->m_config->max_warps_per_shader-1)
 	    // {
 		//     m_shader->m_warp[m_shader->m_last_warp_id] = m_shader->m_warp[0];
@@ -2899,6 +2901,8 @@ bool shd_warp_t::hardware_done() const
 
 bool shd_warp_t::waiting() 
 {
+//    std::cout<<"m_warp_id" << m_warp_id << std::endl;
+//    std::cout<<"m_dynamic_warp_id" << m_dynamic_warp_id << std::endl;
     if ( functional_done() ) {
         // waiting to be initialized with a kernel
         return true;

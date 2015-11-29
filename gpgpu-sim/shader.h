@@ -170,7 +170,7 @@ public:
     unsigned get_n_completed() const { return n_completed; }
     void set_completed( unsigned lane ) 
     { 
-        assert( m_active_threads.test(lane) );
+        //assert( m_active_threads.test(lane) );
         m_active_threads.reset(lane);
         n_completed++; 
     }
@@ -329,6 +329,27 @@ enum concrete_scheduler
     NUM_CONCRETE_SCHEDULERS
 };
 
+class warpsplit_table{
+public:
+    static const int MAX_SIZE = 1;
+    warpsplit_table(std::vector<shd_warp_t*>* supervised_warps) : m_table(), m_supervised_warps(supervised_warps) {}
+
+    void add_warpsplit(shd_warp_t warp, std::bitset<MAX_WARP_SIZE> mask, unsigned dynamic_warp_id) {
+        m_table.push_back(warp);
+        m_table[m_table.size() - 1].set_active_threads(mask);
+    	m_table[m_table.size() - 1].set_dynamic_warp_id(dynamic_warp_id);
+        m_supervised_warps->push_back(&m_table[m_table.size() - 1]);
+    }
+
+    int size() const {
+        return m_table.size();
+    }
+
+private:
+    std::vector<shd_warp_t> m_table;
+    std::vector<shd_warp_t*>* m_supervised_warps;
+};
+
 class scheduler_unit { //this can be copied freely, so can be used in std containers.
 public:
     scheduler_unit(shader_core_stats* stats, shader_core_ctx* shader, 
@@ -339,7 +360,7 @@ public:
                    register_set* mem_out,
                    int id) 
         : m_supervised_warps(), m_stats(stats), m_shader(shader),
-        m_scoreboard(scoreboard), m_simt_stack(simt), /*m_pipeline_reg(pipe_regs),*/ m_warp(warp), m_warpsplit(),
+        m_scoreboard(scoreboard), m_simt_stack(simt), /*m_pipeline_reg(pipe_regs),*/ m_warp(warp), m_warpsplit_table(&m_supervised_warps),
         m_sp_out(sp_out),m_sfu_out(sfu_out),m_mem_out(mem_out), m_id(id){}
     virtual ~scheduler_unit(){}
     virtual void add_supervised_warp_id(int i) {
@@ -411,7 +432,7 @@ protected:
     simt_stack** m_simt_stack;
     //warp_inst_t** m_pipeline_reg;
     std::vector<shd_warp_t>* m_warp;
-    std::vector<shd_warp_t> m_warpsplit;
+    warpsplit_table m_warpsplit_table;
     register_set* m_sp_out;
     register_set* m_sfu_out;
     register_set* m_mem_out;
