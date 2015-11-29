@@ -112,6 +112,10 @@ public:
         m_active_threads |= new_mask;
     } 
 
+    std::bitset<MAX_WARP_SIZE> get_active_threads() const{
+        return m_active_threads;
+    }
+
     //TODO need a function to change m_dynamic_warp_id after splitting
     void set_dynamic_warp_id(unsigned i){
         m_dynamic_warp_id = i;
@@ -346,7 +350,7 @@ public:
     }
 
     bool matched(shd_warp_t* warp){
-       for(int i = 0; i < m_table.size(); ++i)
+       for(unsigned i = 0; i < m_table.size(); ++i)
             if(warp == &m_table[i])
                 return true; 
         return false;
