@@ -339,10 +339,15 @@ public:
     warpsplit_table(std::vector<shd_warp_t*>* supervised_warps) : m_table(), m_supervised_warps(supervised_warps) {}
 
     void add_warpsplit(shd_warp_t warp, std::bitset<MAX_WARP_SIZE> mask, unsigned dynamic_warp_id) {
-        m_table.push_back(warp);
-        m_table[m_table.size() - 1].set_active_threads(mask);
-    	m_table[m_table.size() - 1].set_dynamic_warp_id(dynamic_warp_id);
-        m_supervised_warps->push_back(&m_table[m_table.size() - 1]);
+
+        warpsplit_entry new_entry;
+        new_entry.warp = new shd_warp_t(warp);
+        new_entry.mask = mask;
+        m_table.push_back(new_entry);
+        //m_table[m_table.size() - 1].set_active_threads(mask);
+    	//m_table[m_table.size() - 1].set_dynamic_warp_id(dynamic_warp_id);
+        //m_supervised_warps->push_back(&m_table[m_table.size() - 1]);
+        m_supervised_warps->push_back(new_entry.warp);
     }
 
     int size() const {
@@ -351,13 +356,30 @@ public:
 
     bool matched(shd_warp_t* warp){
        for(unsigned i = 0; i < m_table.size(); ++i)
-            if(warp == &m_table[i])
+            if(warp == m_table[i].warp)
                 return true; 
         return false;
     }
 
+    std::bitset<MAX_WARP_SIZE> get_mask(shd_warp_t* warp){
+       for(unsigned i = 0; i < m_table.size(); ++i)
+            if(warp == m_table[i].warp)
+                return m_table[i].mask;
+        return std::bitset<MAX_WARP_SIZE>((unsigned) (-1));
+    }
+
+    ~warpsplit_table(){
+        for(unsigned i = 0; i < m_table.size(); ++i)
+            delete m_table[i].warp;
+    }
+
 private:
-    std::vector<shd_warp_t> m_table;
+    struct warpsplit_entry{
+        shd_warp_t* warp;
+        std::bitset<MAX_WARP_SIZE> mask;
+    };
+
+    std::vector<warpsplit_entry> m_table;
     std::vector<shd_warp_t*>* m_supervised_warps;
 };
 
