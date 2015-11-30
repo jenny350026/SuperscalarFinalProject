@@ -949,8 +949,6 @@ void scheduler_unit::cycle()
                     m_last_supervised_issued = supervised_iter;
                 }
             }
-            if(m_warpsplit_table.matched(*iter))
-                std::cout << "Run warpsplit" << std::endl;
     	    n_cyc_issue++;
             break;
         } 

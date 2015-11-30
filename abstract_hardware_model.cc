@@ -625,6 +625,12 @@ void simt_stack::get_pdom_stack_top_info( unsigned *pc, unsigned *rpc ) const
    *rpc = m_stack.back().m_recvg_pc;
 }
 
+void simt_stack::get_pdom_stack_top_info( unsigned *pc, unsigned *rpc ,unsigned warpsplit_id) const
+{
+   assert(m_stack.size() > 0);
+   *pc = m_stack.back().m_pc;
+   *rpc = m_stack.back().m_recvg_pc;
+}
 unsigned simt_stack::get_rp() const 
 { 
     assert(m_stack.size() > 0);
