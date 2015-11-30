@@ -98,6 +98,13 @@ public:
         reset(); 
     }
 
+    ~shd_warp_t(){
+        if(right_warpsplit)
+            delete right_warpsplit;
+        if(left_warpsplit)
+            delete left_warpsplit;
+    }
+
     //TODO copy constructor copy all fields from rhs.
     //May not even need this copy constructor since C++ built-in copy constructor copies everything by default, and we don't need any deep copies of pointer variables
 
@@ -117,18 +124,25 @@ public:
             return NULL;
     }
 
-    void set_right_warpsplit(shd_warp_t *right){
-        right_warpsplit = right;
+    shd_warp_t* get_right_warpsplit() const{
+        return right_warpsplit;
     }
 
-    void set_left_warpsplit(shd_warp_t *left){
-        left_warpsplit = left;
+    shd_warp_t* get_left_warpsplit() const{
+        return left_warpsplit;
     }
 
-    void create_warpsplit(std::bitset<MAX_WARP_SIZE> mask){
-        right_warpsplit = new shd_warp_t(*this);
+    bool has_warpsplits(){
+        return left_warpsplit != NULL && right_warpsplit != NULL;
+    }
+
+    void create_warpsplit(unsigned index1, unsigned index2, std::bitset<MAX_WARP_SIZE> mask){
+        m_warpsplit_id = -1;
         left_warpsplit = new shd_warp_t(*this);
+        left_warpsplit->m_warpsplit_id = index1;
 
+        right_warpsplit = new shd_warp_t(*this);
+        right_warpsplit->m_warpsplit_id = index2;
     }
 
     //TODO need a function to change m_active_threads after splitting
@@ -148,7 +162,7 @@ public:
 
     //TODO also need a new warp_id...
     
-    void set_warpsplit_id(unsigned i){
+    void set_warpsplit_id(int i){
         m_warpsplit_id = i;
     }
 
@@ -286,14 +300,14 @@ public:
 
     unsigned get_dynamic_warp_id() const { return m_dynamic_warp_id; }
     unsigned get_warp_id() const { return m_warp_id; }
-    unsigned get_warpsplit_id() const { return m_warpsplit_id; }
+    int get_warpsplit_id() const { return m_warpsplit_id; }
 
 private:
     static const unsigned IBUFFER_SIZE=2;
     class shader_core_ctx *m_shader;
     unsigned m_cta_id;
     unsigned m_warp_id;
-    unsigned m_warpsplit_id; //NOTE should change on split
+    int m_warpsplit_id; //NOTE should change on split
     unsigned m_warp_size;
     unsigned m_dynamic_warp_id; //NOTE should change on split
 
@@ -326,14 +340,14 @@ private:
     shd_warp_t *right_warpsplit;
     shd_warp_t *left_warpsplit;
 
-    bool found_warpsplit(unsigned i, shd_warp_t **temp){
+    bool found_warpsplit(int i, shd_warp_t **temp){
         if(m_warpsplit_id == i){
             *temp = this;
             return true;
         }
-        if(right_warpsplit->found_warpsplit(i, temp))
+        if(right_warpsplit && right_warpsplit->found_warpsplit(i, temp))
             return true;
-        if(left_warpsplit->found_warpsplit(i, temp))
+        if(left_warpsplit && left_warpsplit->found_warpsplit(i, temp))
             return true;
 
         return false; 
@@ -490,7 +504,7 @@ public:
     virtual void order_warps() = 0;
 
 protected:
-    virtual void do_on_warp_issued( unsigned warp_id, unsigned warpsplit_id,
+    virtual void do_on_warp_issued( unsigned warp_id, int warpsplit_id,
                                     unsigned num_issued,
                                     const std::vector< shd_warp_t* >::const_iterator& prioritized_iter );
     inline int get_sid() const;
@@ -597,7 +611,7 @@ public:
     }
 
 protected:
-    virtual void do_on_warp_issued( unsigned warp_id, unsigned warpsplit_id,
+    virtual void do_on_warp_issued( unsigned warp_id, int warpsplit_id,
                                     unsigned num_issued,
                                     const std::vector< shd_warp_t* >::const_iterator& prioritized_iter );
 
@@ -1894,7 +1908,7 @@ public:
     friend class scheduler_unit; //this is needed to use private issue warp.
     friend class TwoLevelScheduler;
     friend class LooseRoundRobbinScheduler;
-    void issue_warp( register_set& warp, const warp_inst_t *pI, const active_mask_t &active_mask, unsigned warp_id, unsigned warpsplit_id );
+    void issue_warp( register_set& warp, const warp_inst_t *pI, const active_mask_t &active_mask, unsigned warp_id, int warpsplit_id );
     void func_exec_inst( warp_inst_t &inst );
 
      // Returns numbers of addresses in translated_addrs

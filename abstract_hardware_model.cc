@@ -586,7 +586,7 @@ simt_stack::simt_stack( unsigned wid, unsigned warpSize) : m_warpsplit_table()
     reset();
 }
 
-void simt_stack::add_warpsplit(unsigned *index1, unsigned *index2, std::bitset<MAX_WARP_SIZE> mask){
+void simt_stack::add_warpsplit(int *index1, int *index2, std::bitset<MAX_WARP_SIZE> mask){
     m_warpsplit_table.add_warpsplit(index1, index2, m_stack.back().m_active_mask, mask, m_stack.back().m_pc, m_stack.back().m_pc);
 }
 
@@ -606,10 +606,13 @@ void simt_stack::launch( address_type start_pc, const simt_mask_t &active_mask )
     m_stack.push_back(new_stack_entry);
 }
 
-const simt_mask_t &simt_stack::get_active_mask(unsigned warpsplit_id) const
+const simt_mask_t &simt_stack::get_active_mask(int warpsplit_id) const
 {
     assert(m_stack.size() > 0);
-    return m_stack.back().m_active_mask;
+    if(warpsplit_id == -1)
+        return m_stack.back().m_active_mask;
+    else
+        return m_warpsplit_table.get_mask(warpsplit_id);
 }
 
 const simt_mask_t &simt_stack::get_active_mask() const
@@ -625,7 +628,7 @@ void simt_stack::get_pdom_stack_top_info( unsigned *pc, unsigned *rpc ) const
    *rpc = m_stack.back().m_recvg_pc;
 }
 
-void simt_stack::get_pdom_stack_top_info( unsigned *pc, unsigned *rpc ,unsigned warpsplit_id) const
+void simt_stack::get_pdom_stack_top_info( unsigned *pc, unsigned *rpc ,int warpsplit_id) const
 {
    assert(m_stack.size() > 0);
    *pc = m_stack.back().m_pc;
@@ -800,7 +803,7 @@ void simt_stack::update(simt_mask_t &thread_done, addr_vector_t &next_pc, addres
     }
 }
 
-void simt_stack::update(unsigned warpsplit_id, simt_mask_t &thread_done, addr_vector_t &next_pc, address_type recvg_pc, op_type next_inst_op,unsigned next_inst_size, address_type next_inst_pc )
+void simt_stack::update(int warpsplit_id, simt_mask_t &thread_done, addr_vector_t &next_pc, address_type recvg_pc, op_type next_inst_op,unsigned next_inst_size, address_type next_inst_pc )
 {
     assert(m_stack.size() > 0);
 
@@ -975,7 +978,7 @@ void core_t::updateSIMTStack(unsigned warpId, warp_inst_t * inst)
     m_simt_stack[warpId]->update(thread_done,next_pc,inst->reconvergence_pc, inst->op,inst->isize,inst->pc);
 }
   
-void core_t::updateSIMTStack(unsigned warpId, unsigned warpsplit_id, warp_inst_t * inst)
+void core_t::updateSIMTStack(unsigned warpId, int warpsplit_id, warp_inst_t * inst)
 {
     simt_mask_t thread_done;
     addr_vector_t next_pc;

@@ -689,7 +689,7 @@ void shader_core_ctx::func_exec_inst( warp_inst_t &inst )
         inst.generate_mem_accesses();
 }
 
-void shader_core_ctx::issue_warp( register_set& pipe_reg_set, const warp_inst_t* next_inst, const active_mask_t &active_mask, unsigned warp_id, unsigned warpsplit_id )
+void shader_core_ctx::issue_warp( register_set& pipe_reg_set, const warp_inst_t* next_inst, const active_mask_t &active_mask, unsigned warp_id, int warpsplit_id )
 {
     warp_inst_t** pipe_reg = pipe_reg_set.get_free();
     assert(pipe_reg);
@@ -848,7 +848,7 @@ void scheduler_unit::cycle()
         SCHED_DPRINTF( "Testing (warp_id %u, dynamic_warp_id %u)\n",
                        (*iter)->get_warp_id(), (*iter)->get_dynamic_warp_id() );
         unsigned warp_id = (*iter)->get_warp_id();
-        unsigned warpsplit_id = (*iter)->get_warpsplit_id();
+        int warpsplit_id = (*iter)->get_warpsplit_id();
         unsigned checked=0;
         unsigned issued=0;
         unsigned max_issue = m_shader->m_config->gpgpu_max_insn_issue_per_warp;
@@ -878,10 +878,9 @@ void scheduler_unit::cycle()
                         ready_inst = true;
                         // TODO change active mask
                         const active_mask_t &active_mask = m_simt_stack[warp_id]->get_active_mask(warpsplit_id);
+                        std::cout << "final mask " << active_mask << std::endl;
 
                         /*
-                        const active_mask_t &temp_active_mask = m_simt_stack[warp_id]->get_active_mask();
-                        active_mask_t active_mask = temp_active_mask;
                         if(m_warpsplit_table.matched(*iter)){
                             active_mask = temp_active_mask & m_warpsplit_table.get_mask(*iter); 
                             
@@ -967,10 +966,31 @@ void scheduler_unit::cycle()
         // TODO will have to pick the right warp to split
         //if(m_warpsplit_table.size() < m_warpsplit_table.MAX_SIZE ){
         //    std::cout<<"Warp SPLIT!!!!" << std::endl; 
-            //int warp_id = 0;
-            //shd_warp_t* new_warpsplit = new shd_warp_t(m_shader->m_warp[warp_id]);
-            //new_warpsplit->set_dynamic_warp_id(m_shader->m_dynamic_warp_id++);
-            //m_simt_stack[warp_id]->add_warpsplit(std::bitset<MAX_WARP_SIZE>(3));
+            int warp_id = 0;
+            if(!(*m_warp)[warp_id].has_warpsplits()){
+                std::bitset<MAX_WARP_SIZE> new_mask = std::bitset<MAX_WARP_SIZE>(3);
+                //shd_warp_t* new_warpsplit = new shd_warp_t(m_shader->m_warp[warp_id]);
+                //new_warpsplit->set_dynamic_warp_id(m_shader->m_dynamic_warp_id++);
+                int new_warpsplit_id1 = -1, new_warpsplit_id2 = -1;
+                m_simt_stack[warp_id]->add_warpsplit(&new_warpsplit_id1, &new_warpsplit_id2, new_mask); 
+                if(new_warpsplit_id1 != -1 && new_warpsplit_id2 != -1)
+                    (*m_warp)[warp_id].create_warpsplit(new_warpsplit_id1, new_warpsplit_id2, new_mask);
+
+                
+                std::vector< shd_warp_t* >::iterator iter = m_supervised_warps.end();
+                for ( std::vector< shd_warp_t* >::iterator supervised_iter = m_supervised_warps.begin(); supervised_iter != m_supervised_warps.end(); ++supervised_iter){
+                    if(*supervised_iter == &(*m_warp)[warp_id])
+                        iter = supervised_iter;
+                }
+                
+                assert(iter != m_supervised_warps.end()); 
+                if(iter != m_supervised_warps.end())
+                    m_supervised_warps.erase(iter);
+
+                m_supervised_warps.push_back((*iter)->get_right_warpsplit());
+                m_supervised_warps.push_back((*iter)->get_left_warpsplit());
+                    
+            }
             //m_supervised_warps.push_back(new_warpsplit);
             //m_warpsplit.push_back(new_warpsplit);
         //}
@@ -993,7 +1013,7 @@ void scheduler_unit::cycle()
 	  //  printf("n_cyc_tot, n_cyc_idle, n_cyc_issue = (%d, %d, %d)\n", n_cyc_tot, n_cyc_idle, n_cyc_issue);
 }
 
-void scheduler_unit::do_on_warp_issued( unsigned warp_id, unsigned warpsplit_id,
+void scheduler_unit::do_on_warp_issued( unsigned warp_id, int warpsplit_id,
                                         unsigned num_issued,
                                         const std::vector< shd_warp_t* >::const_iterator& prioritized_iter )
 {
@@ -1038,7 +1058,7 @@ void gto_scheduler::order_warps()
 }
 
 void
-two_level_active_scheduler::do_on_warp_issued( unsigned warp_id, unsigned warpsplit_id,
+two_level_active_scheduler::do_on_warp_issued( unsigned warp_id, int warpsplit_id,
                                                unsigned num_issued,
                                                const std::vector< shd_warp_t* >::const_iterator& prioritized_iter )
 {
