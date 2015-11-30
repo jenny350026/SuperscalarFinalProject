@@ -120,7 +120,6 @@ shader_core_ctx::shader_core_ctx( class gpgpu_sim *gpu,
     snprintf(name, STRSIZE, "L1I_%03d", m_sid);
     m_L1I = new read_only_cache( name,m_config->m_L1I_config,m_sid,get_shader_instruction_cache_id(),m_icnt,IN_L1I_MISS_QUEUE);
     
-    //NOTE m_warp can already hold max number of warp a shader can support, just need to enable next warp if a new warp is needed
     m_warp.resize(m_config->max_warps_per_shader, shd_warp_t(this, warp_size));
     m_scoreboard = new Scoreboard(m_sid, m_config->max_warps_per_shader);
     
@@ -733,6 +732,8 @@ shd_warp_t& scheduler_unit::warp(int i, int warpsplit_id){
     if(warpsplit_id == -1)
         return (*m_warp)[i];
     shd_warp_t *temp = (*m_warp)[i].find_warpsplit(warpsplit_id);
+    //std::cout<<"looking for warpsplit " << warpsplit_id << std::endl;
+    //std::cout<<"found warp split warpId: " << temp->get_warp_id() << " warpsplitID: " << temp->get_warpsplit_id() << std::endl;
     assert(temp != NULL);
     return *temp;
 }
@@ -853,8 +854,11 @@ void scheduler_unit::cycle()
         unsigned issued=0;
         unsigned max_issue = m_shader->m_config->gpgpu_max_insn_issue_per_warp;
  
-                        if(warpsplit_id!=-1)
-                            std::cout<<"warpsplit id != -1"<<std::endl;
+        if(warpsplit_id!=-1){
+            std::cout<<"before while warpsplit id != -1"<<std::endl;
+            std::cout<<"warp waiting " << warp(warp_id, warpsplit_id).waiting() << std::endl;
+            std::cout<<"warp ibuffer empty" << warp(warp_id, warpsplit_id).ibuffer_empty() << std::endl;
+        }
        while( !warp(warp_id, warpsplit_id).waiting() && !warp(warp_id, warpsplit_id).ibuffer_empty() && (checked < max_issue) && (checked <= issued) && (issued < max_issue) ) {
             const warp_inst_t *pI = warp(warp_id, warpsplit_id).ibuffer_next_inst();
             bool valid = warp(warp_id, warpsplit_id).ibuffer_next_valid();
@@ -864,6 +868,8 @@ void scheduler_unit::cycle()
             SCHED_DPRINTF( "Warp (warp_id %u, dynamic_warp_id %u) has valid instruction (%s)\n",
                            (*iter)->get_warp_id(), (*iter)->get_dynamic_warp_id(),
                            ptx_get_insn_str( pc).c_str() );
+            if(warpsplit_id!=-1)
+                std::cout<<"inside while warpsplit id != -1"<<std::endl;
             if( pI ) {
                 assert(valid);
                 if( pc != pI->pc ) {
