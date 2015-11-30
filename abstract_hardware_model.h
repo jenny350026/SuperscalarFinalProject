@@ -28,6 +28,7 @@
 #ifndef ABSTRACT_HARDWARE_MODEL_INCLUDED
 #define ABSTRACT_HARDWARE_MODEL_INCLUDED
 
+
 // Forward declarations
 class gpgpu_sim;
 class kernel_info_t;
@@ -298,16 +299,105 @@ typedef std::bitset<MAX_WARP_SIZE> active_mask_t;
 typedef std::bitset<MAX_WARP_SIZE_SIMT_STACK> simt_mask_t;
 typedef std::vector<address_type> addr_vector_t;
 
+class warpsplit_table{
+public:
+    static const int MAX_SIZE = 2;
+    warpsplit_table() : m_table(MAX_SIZE) {
+        for(unsigned i = 0; i < m_table.size(); ++i)
+            m_table[i].m_valid = false;    
+    }
+
+    void add_warpsplit(unsigned *index1, unsigned *index2, active_mask_t active_mask, active_mask_t new_mask, address_type pc1, address_type pc2) {
+    
+        int counter = 0, temp1 = -1, temp2 = -1;
+        for(unsigned i = 0; i < m_table.size(); ++i){
+            if(m_table[i].m_valid == false){
+                if(counter == 0){
+                    temp1 = i;
+                    ++counter;
+                }
+                else if (counter == 1){
+                    temp2 = i;
+                    ++counter;
+                    break;
+                }
+            }
+        }
+        
+        if(counter != 2)
+            return;
+       
+        *index1 = temp1;
+        *index2 = temp2; 
+
+        m_table[*index1].m_valid = true;
+        m_table[*index2].m_valid = true;
+        m_table[*index1].m_mask = active_mask & new_mask;
+        m_table[*index2].m_mask = active_mask & ~new_mask;
+        m_table[*index1].m_pc = pc1;
+        m_table[*index2].m_pc = pc2;
+        //new_entry.mask = mask;
+        //m_table.push_back(new_entry);
+        //m_table[m_table.size() - 1].set_active_threads(mask);
+    	//m_table[m_table.size() - 1].set_dynamic_warp_id(dynamic_warp_id);
+        //m_supervised_warps->push_back(&m_table[m_table.size() - 1]);
+        //m_supervised_warps->push_back(new_entry.warp);
+    }
+
+    int size() const {
+        return m_table.size();
+    }
+
+/*
+    bool matched(shd_warp_t* warp){
+       for(unsigned i = 0; i < m_table.size(); ++i)
+            if(warp == m_table[i].warp)
+                return true; 
+        return false;
+    }
+*/
+
+    std::bitset<MAX_WARP_SIZE> get_mask(int warpsplit_id){
+        if(m_table[warpsplit_id].m_valid)
+            return m_table[warpsplit_id].m_mask;
+        return std::bitset<MAX_WARP_SIZE>((unsigned) (-1));
+    }
+
+/*
+    ~warpsplit_table(){
+        for(unsigned i = 0; i < m_table.size(); ++i)
+            delete m_table[i].warp;
+    }
+*/
+
+private:
+    struct warpsplit_entry{
+        //shd_warp_t* warp;
+        address_type m_pc;
+        simt_mask_t m_mask;
+        bool m_valid;
+    };
+    
+    std::vector<warpsplit_entry> m_table;
+    //std::vector<shd_warp_t*>* m_supervised_warps;
+};
+
+
 class simt_stack {
 public:
     simt_stack( unsigned wid,  unsigned warpSize);
 
     void reset();
     void launch( address_type start_pc, const simt_mask_t &active_mask );
-    void update( simt_mask_t &thread_done, addr_vector_t &next_pc, address_type recvg_pc, op_type next_inst_op,unsigned next_inst_size, address_type next_inst_pc );
+    void update(simt_mask_t &thread_done, addr_vector_t &next_pc, address_type recvg_pc, op_type next_inst_op,unsigned next_inst_size, address_type next_inst_pc );
+    void update(unsigned warpsplit_id, simt_mask_t &thread_done, addr_vector_t &next_pc, address_type recvg_pc, op_type next_inst_op,unsigned next_inst_size, address_type next_inst_pc );
 
+    void add_warpsplit(unsigned *index1, unsigned *index2, std::bitset<MAX_WARP_SIZE> mask);
+
+    const simt_mask_t &get_active_mask(unsigned warpsplit_id) const;
     const simt_mask_t &get_active_mask() const;
     void     get_pdom_stack_top_info( unsigned *pc, unsigned *rpc ) const;
+    void     get_pdom_stack_top_info( unsigned *pc, unsigned *rpc, unsigned warpsplit_id) const;
     unsigned get_rp() const;
     void     print(FILE*fp) const;
 
@@ -332,6 +422,9 @@ protected:
     };
 
     std::deque<simt_stack_entry> m_stack;
+
+    warpsplit_table m_warpsplit_table;
+
 };
 
 #define GLOBAL_HEAP_START 0x80000000
@@ -1042,6 +1135,7 @@ class core_t {
         class gpgpu_sim * get_gpu() {return m_gpu;}
         void execute_warp_inst_t(warp_inst_t &inst, unsigned warpId =(unsigned)-1);
         bool  ptx_thread_done( unsigned hw_thread_id ) const ;
+        void updateSIMTStack(unsigned warpId, unsigned warpsplit_id, warp_inst_t * inst);
         void updateSIMTStack(unsigned warpId, warp_inst_t * inst);
         void initilizeSIMTStack(unsigned warp_count, unsigned warps_size);
         void deleteSIMTStack();

@@ -92,6 +92,9 @@ public:
     {
         m_stores_outstanding=0;
         m_inst_in_pipeline=0;
+        m_warpsplit_id = -1;
+        right_warpsplit = NULL;
+        left_warpsplit = NULL;
         reset(); 
     }
 
@@ -105,6 +108,28 @@ public:
    // shd_warp_t& operator=(const shd_warp_t& other){
 
    // }
+
+    shd_warp_t* find_warpsplit(int i){
+        shd_warp_t *temp = NULL;
+        if(found_warpsplit(i, &temp))
+            return temp;
+        else
+            return NULL;
+    }
+
+    void set_right_warpsplit(shd_warp_t *right){
+        right_warpsplit = right;
+    }
+
+    void set_left_warpsplit(shd_warp_t *left){
+        left_warpsplit = left;
+    }
+
+    void create_warpsplit(std::bitset<MAX_WARP_SIZE> mask){
+        right_warpsplit = new shd_warp_t(*this);
+        left_warpsplit = new shd_warp_t(*this);
+
+    }
 
     //TODO need a function to change m_active_threads after splitting
     void set_active_threads(std::bitset<MAX_WARP_SIZE> new_mask){
@@ -123,8 +148,8 @@ public:
 
     //TODO also need a new warp_id...
     
-    void set_warp_id(unsigned i){
-        m_warp_id = i;
+    void set_warpsplit_id(unsigned i){
+        m_warpsplit_id = i;
     }
 
     //TODO other fields that needs to be changed...?
@@ -261,12 +286,14 @@ public:
 
     unsigned get_dynamic_warp_id() const { return m_dynamic_warp_id; }
     unsigned get_warp_id() const { return m_warp_id; }
+    unsigned get_warpsplit_id() const { return m_warpsplit_id; }
 
 private:
     static const unsigned IBUFFER_SIZE=2;
     class shader_core_ctx *m_shader;
     unsigned m_cta_id;
-    unsigned m_warp_id; //NOTE should change on split
+    unsigned m_warp_id;
+    unsigned m_warpsplit_id; //NOTE should change on split
     unsigned m_warp_size;
     unsigned m_dynamic_warp_id; //NOTE should change on split
 
@@ -295,6 +322,23 @@ private:
 
     unsigned m_stores_outstanding; // number of store requests sent but not yet acknowledged
     unsigned m_inst_in_pipeline;
+
+    shd_warp_t *right_warpsplit;
+    shd_warp_t *left_warpsplit;
+
+    bool found_warpsplit(unsigned i, shd_warp_t **temp){
+        if(m_warpsplit_id == i){
+            *temp = this;
+            return true;
+        }
+        if(right_warpsplit->found_warpsplit(i, temp))
+            return true;
+        if(left_warpsplit->found_warpsplit(i, temp))
+            return true;
+
+        return false; 
+    }
+
 };
 
 
@@ -333,6 +377,7 @@ enum concrete_scheduler
     NUM_CONCRETE_SCHEDULERS
 };
 
+/*
 class warpsplit_table{
 public:
     static const int MAX_SIZE = 1;
@@ -382,6 +427,7 @@ private:
     std::vector<warpsplit_entry> m_table;
     std::vector<shd_warp_t*>* m_supervised_warps;
 };
+*/
 
 class scheduler_unit { //this can be copied freely, so can be used in std containers.
 public:
@@ -393,11 +439,14 @@ public:
                    register_set* mem_out,
                    int id) 
         : m_supervised_warps(), m_stats(stats), m_shader(shader),
-        m_scoreboard(scoreboard), m_simt_stack(simt), /*m_pipeline_reg(pipe_regs),*/ m_warp(warp), m_warpsplit_table(&m_supervised_warps),
+        m_scoreboard(scoreboard), m_simt_stack(simt), /*m_pipeline_reg(pipe_regs),*/ m_warp(warp), /*m_warpsplit_table(&m_supervised_warps),*/
         m_sp_out(sp_out),m_sfu_out(sfu_out),m_mem_out(mem_out), m_id(id){}
-    virtual ~scheduler_unit(){}
-    virtual void add_supervised_warp_id(int i) {
-        m_supervised_warps.push_back(&warp(i));
+    virtual ~scheduler_unit(){
+    for(unsigned i=0;i<m_warpsplit.size();i++)
+        delete m_warpsplit[i];
+    }
+    virtual void add_supervised_warp_id(int i, int warpsplit_id) {
+        m_supervised_warps.push_back(&warp(i, warpsplit_id));
     }
     virtual void done_adding_supervised_warps() {
         m_last_supervised_issued = m_supervised_warps.end();
@@ -441,12 +490,12 @@ public:
     virtual void order_warps() = 0;
 
 protected:
-    virtual void do_on_warp_issued( unsigned warp_id,
+    virtual void do_on_warp_issued( unsigned warp_id, unsigned warpsplit_id,
                                     unsigned num_issued,
                                     const std::vector< shd_warp_t* >::const_iterator& prioritized_iter );
     inline int get_sid() const;
 protected:
-    shd_warp_t& warp(int i);
+    shd_warp_t& warp(int i, int warpsplit_id);
 
     // This is the prioritized warp list that is looped over each cycle to determine
     // which warp gets to issue.
@@ -465,7 +514,8 @@ protected:
     simt_stack** m_simt_stack;
     //warp_inst_t** m_pipeline_reg;
     std::vector<shd_warp_t>* m_warp;
-    warpsplit_table m_warpsplit_table;
+    std::vector<shd_warp_t*> m_warpsplit;
+    //warpsplit_table m_warpsplit_table;
     register_set* m_sp_out;
     register_set* m_sfu_out;
     register_set* m_mem_out;
@@ -535,11 +585,11 @@ public:
     }
 	virtual ~two_level_active_scheduler () {}
     virtual void order_warps();
-	void add_supervised_warp_id(int i) {
+	void add_supervised_warp_id(int i, int warpsplit_id) {
         if ( m_next_cycle_prioritized_warps.size() < m_max_active_warps ) {
-            m_next_cycle_prioritized_warps.push_back( &warp(i) );
+            m_next_cycle_prioritized_warps.push_back( &warp(i, warpsplit_id) );
         } else {
-		    m_pending_warps.push_back(&warp(i));
+		    m_pending_warps.push_back(&warp(i, warpsplit_id));
         }
 	}
     virtual void done_adding_supervised_warps() {
@@ -547,7 +597,7 @@ public:
     }
 
 protected:
-    virtual void do_on_warp_issued( unsigned warp_id,
+    virtual void do_on_warp_issued( unsigned warp_id, unsigned warpsplit_id,
                                     unsigned num_issued,
                                     const std::vector< shd_warp_t* >::const_iterator& prioritized_iter );
 
@@ -1823,6 +1873,7 @@ public:
 	 bool check_if_non_released_reduction_barrier(warp_inst_t &inst);
 
 	private:
+     shd_warp_t& warp(int i, int warpsplit_id);
 	 unsigned inactive_lanes_accesses_sfu(unsigned active_count,double latency){
       return  ( ((32-active_count)>>1)*latency) + ( ((32-active_count)>>3)*latency) + ( ((32-active_count)>>3)*latency);
 	 }
@@ -1843,7 +1894,7 @@ public:
     friend class scheduler_unit; //this is needed to use private issue warp.
     friend class TwoLevelScheduler;
     friend class LooseRoundRobbinScheduler;
-    void issue_warp( register_set& warp, const warp_inst_t *pI, const active_mask_t &active_mask, unsigned warp_id );
+    void issue_warp( register_set& warp, const warp_inst_t *pI, const active_mask_t &active_mask, unsigned warp_id, unsigned warpsplit_id );
     void func_exec_inst( warp_inst_t &inst );
 
      // Returns numbers of addresses in translated_addrs
