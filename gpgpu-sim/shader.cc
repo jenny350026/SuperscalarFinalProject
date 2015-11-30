@@ -869,7 +869,7 @@ void scheduler_unit::cycle()
                             active_mask = temp_active_mask & m_warpsplit_table.get_mask(*iter); 
                             
                             std::cout << "simt mask " << m_simt_stack[warp_id]->get_active_mask() << std::endl;
-                            std::cout << "warp mask " << (*iter)->get_active_threads() << std::endl;
+                            std::cout << "warp mask " << m_warpsplit_table.get_mask(*iter) << std::endl;
                             std::cout << "final mask " << active_mask << std::endl;
                         }
                         assert( warp(warp_id).inst_in_pipeline() );
