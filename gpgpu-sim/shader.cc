@@ -725,7 +725,7 @@ shd_warp_t& shader_core_ctx::warp(int i, int warpsplit_id){
     if(warpsplit_id == -1)
         return m_warp[i];
     shd_warp_t *temp = m_warp[i].find_warpsplit(warpsplit_id);
-    assert(temp == NULL);
+    assert(temp != NULL);
     return *temp;
 }
 
@@ -733,7 +733,7 @@ shd_warp_t& scheduler_unit::warp(int i, int warpsplit_id){
     if(warpsplit_id == -1)
         return (*m_warp)[i];
     shd_warp_t *temp = (*m_warp)[i].find_warpsplit(warpsplit_id);
-    assert(temp == NULL);
+    assert(temp != NULL);
     return *temp;
 }
 
@@ -852,7 +852,10 @@ void scheduler_unit::cycle()
         unsigned checked=0;
         unsigned issued=0;
         unsigned max_issue = m_shader->m_config->gpgpu_max_insn_issue_per_warp;
-        while( !warp(warp_id, warpsplit_id).waiting() && !warp(warp_id, warpsplit_id).ibuffer_empty() && (checked < max_issue) && (checked <= issued) && (issued < max_issue) ) {
+ 
+                        if(warpsplit_id!=-1)
+                            std::cout<<"warpsplit id != -1"<<std::endl;
+       while( !warp(warp_id, warpsplit_id).waiting() && !warp(warp_id, warpsplit_id).ibuffer_empty() && (checked < max_issue) && (checked <= issued) && (issued < max_issue) ) {
             const warp_inst_t *pI = warp(warp_id, warpsplit_id).ibuffer_next_inst();
             bool valid = warp(warp_id, warpsplit_id).ibuffer_next_valid();
             bool warp_inst_issued = false;
@@ -878,7 +881,6 @@ void scheduler_unit::cycle()
                         ready_inst = true;
                         // TODO change active mask
                         const active_mask_t &active_mask = m_simt_stack[warp_id]->get_active_mask(warpsplit_id);
-                        std::cout << "final mask " << active_mask << std::endl;
 
                         /*
                         if(m_warpsplit_table.matched(*iter)){
@@ -967,28 +969,30 @@ void scheduler_unit::cycle()
         //if(m_warpsplit_table.size() < m_warpsplit_table.MAX_SIZE ){
         //    std::cout<<"Warp SPLIT!!!!" << std::endl; 
             int warp_id = 0;
-            if(!(*m_warp)[warp_id].has_warpsplits()){
+            if((*m_warp)[warp_id].has_no_warpsplits()){
                 std::bitset<MAX_WARP_SIZE> new_mask = std::bitset<MAX_WARP_SIZE>(3);
                 //shd_warp_t* new_warpsplit = new shd_warp_t(m_shader->m_warp[warp_id]);
                 //new_warpsplit->set_dynamic_warp_id(m_shader->m_dynamic_warp_id++);
                 int new_warpsplit_id1 = -1, new_warpsplit_id2 = -1;
                 m_simt_stack[warp_id]->add_warpsplit(&new_warpsplit_id1, &new_warpsplit_id2, new_mask); 
-                if(new_warpsplit_id1 != -1 && new_warpsplit_id2 != -1)
+                if(new_warpsplit_id1 != -1 && new_warpsplit_id2 != -1){
+                    std::cout<<"warp split"<<std::endl;
                     (*m_warp)[warp_id].create_warpsplit(new_warpsplit_id1, new_warpsplit_id2, new_mask);
-
                 
-                std::vector< shd_warp_t* >::iterator iter = m_supervised_warps.end();
-                for ( std::vector< shd_warp_t* >::iterator supervised_iter = m_supervised_warps.begin(); supervised_iter != m_supervised_warps.end(); ++supervised_iter){
-                    if(*supervised_iter == &(*m_warp)[warp_id])
-                        iter = supervised_iter;
+                    std::vector< shd_warp_t* >::iterator iter = m_supervised_warps.end();
+                    for ( std::vector< shd_warp_t* >::iterator supervised_iter = m_supervised_warps.begin(); supervised_iter != m_supervised_warps.end(); ++supervised_iter){
+                        if(*supervised_iter == &(*m_warp)[warp_id])
+                            iter = supervised_iter;
+                    }
+                    
+                    assert(iter != m_supervised_warps.end()); 
+                    if(iter != m_supervised_warps.end())
+                        m_supervised_warps.erase(iter);
+                    assert((*m_warp)[warp_id].get_right_warpsplit());
+                    assert((*m_warp)[warp_id].get_left_warpsplit());
+                    m_supervised_warps.push_back((*m_warp)[warp_id].get_right_warpsplit());
+                    m_supervised_warps.push_back((*m_warp)[warp_id].get_left_warpsplit());
                 }
-                
-                assert(iter != m_supervised_warps.end()); 
-                if(iter != m_supervised_warps.end())
-                    m_supervised_warps.erase(iter);
-
-                m_supervised_warps.push_back((*iter)->get_right_warpsplit());
-                m_supervised_warps.push_back((*iter)->get_left_warpsplit());
                     
             }
             //m_supervised_warps.push_back(new_warpsplit);

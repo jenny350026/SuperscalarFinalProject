@@ -31,6 +31,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <iostream>
 #include <math.h>
 #include <assert.h>
 #include <map>
@@ -131,6 +132,9 @@ public:
     shd_warp_t* get_left_warpsplit() const{
         return left_warpsplit;
     }
+bool has_no_warpsplits(){
+    return left_warpsplit == NULL && right_warpsplit == NULL;
+}
 
     bool has_warpsplits(){
         return left_warpsplit != NULL && right_warpsplit != NULL;
