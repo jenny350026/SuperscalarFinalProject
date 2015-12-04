@@ -1241,6 +1241,7 @@ public:
     ldst_unit( mem_fetch_interface *icnt,
                shader_core_mem_fetch_allocator *mf_allocator,
                shader_core_ctx *core, 
+               simt_stack **simt,
                opndcoll_rfu_t *operand_collector,
                Scoreboard *scoreboard,
                const shader_core_config *config, 
@@ -1286,6 +1287,7 @@ protected:
     ldst_unit( mem_fetch_interface *icnt,
                shader_core_mem_fetch_allocator *mf_allocator,
                shader_core_ctx *core, 
+               //simt_stack **simt,
                opndcoll_rfu_t *operand_collector,
                Scoreboard *scoreboard,
                const shader_core_config *config,
@@ -1323,6 +1325,7 @@ protected:
    class mem_fetch_interface *m_icnt;
    shader_core_mem_fetch_allocator *m_mf_allocator;
    class shader_core_ctx *m_core;
+   simt_stack **m_simt_stack;
    unsigned m_sid;
    unsigned m_tpc;
 
@@ -1773,6 +1776,7 @@ public:
     void decrement_atomic_count( unsigned wid, unsigned n );
     void inc_store_req( unsigned warp_id) { m_warp[warp_id].inc_store_req(); }
     void dec_inst_in_pipeline( unsigned warp_id ) { m_warp[warp_id].dec_inst_in_pipeline(); } // also used in writeback()
+    void dec_inst_in_pipeline( unsigned warp_id, int warpsplit_id ) { warp(warp_id, warpsplit_id).dec_inst_in_pipeline(); } // also used in writeback()
     void store_ack( class mem_fetch *mf );
     bool warp_waiting_at_mem_barrier( unsigned warp_id );
     void set_max_cta( const kernel_info_t &kernel );

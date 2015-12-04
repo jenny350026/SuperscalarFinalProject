@@ -284,7 +284,7 @@ shader_core_ctx::shader_core_ctx( class gpgpu_sim *gpu,
         m_issue_port.push_back(OC_EX_SFU);
     }
     
-    m_ldst_unit = new ldst_unit( m_icnt, m_mem_fetch_allocator, this, &m_operand_collector, m_scoreboard, config, mem_config, stats, shader_id, tpc_id );
+    m_ldst_unit = new ldst_unit( m_icnt, m_mem_fetch_allocator, this, m_simt_stack, &m_operand_collector, m_scoreboard, config, mem_config, stats, shader_id, tpc_id );
     m_fu.push_back(m_ldst_unit);
     m_dispatch_port.push_back(ID_OC_MEM);
     m_issue_port.push_back(OC_EX_MEM);
@@ -1715,13 +1715,14 @@ void ldst_unit::init( mem_fetch_interface *icnt,
 ldst_unit::ldst_unit( mem_fetch_interface *icnt,
                       shader_core_mem_fetch_allocator *mf_allocator,
                       shader_core_ctx *core, 
+                      simt_stack **simt,
                       opndcoll_rfu_t *operand_collector,
                       Scoreboard *scoreboard,
                       const shader_core_config *config,
                       const memory_config *mem_config,  
                       shader_core_stats *stats,
                       unsigned sid,
-                      unsigned tpc ) : pipelined_simd_unit(NULL,config,3,core), m_next_wb(config)
+                      unsigned tpc ) : pipelined_simd_unit(NULL,config,3,core), m_next_wb(config), m_simt_stack(simt)
 {
     init( icnt,
           mf_allocator,
@@ -1838,7 +1839,8 @@ void ldst_unit::writeback()
                     m_next_wb.do_atomic();
                     m_core->decrement_atomic_count(m_next_wb.warp_id(), m_next_wb.active_count());
                 }
-                m_core->dec_inst_in_pipeline(m_pipeline_reg[0]->warp_id());
+                unsigned warp_id = m_pipeline_reg[0]->warp_id();
+                m_core->dec_inst_in_pipeline(warp_id, m_simt_stack[warp_id]->find_warpsplit_id_by_active_mask(m_pipeline_reg[0]->get_active_mask()));
                 m_pipeline_reg[0]->clear();
                 serviced_client = next_client; 
             }
@@ -2022,12 +2024,15 @@ void ldst_unit::cycle()
                    m_core->warp_inst_complete(*m_dispatch_reg);
                    m_scoreboard->releaseRegisters(m_dispatch_reg);
                }
-               m_core->dec_inst_in_pipeline(warp_id);
+               //m_core->dec_inst_in_pipeline(warp_id);
+               m_core->dec_inst_in_pipeline(warp_id, m_simt_stack[warp_id]->find_warpsplit_id_by_active_mask(pipe_reg.get_active_mask()));
+
                m_dispatch_reg->clear();
            }
        } else {
            // stores exit pipeline here
-           m_core->dec_inst_in_pipeline(warp_id);
+           m_core->dec_inst_in_pipeline(warp_id, m_simt_stack[warp_id]->find_warpsplit_id_by_active_mask(pipe_reg.get_active_mask()));
+           // m_core->dec_inst_in_pipeline(warp_id);
            m_core->warp_inst_complete(*m_dispatch_reg);
            m_dispatch_reg->clear();
        }
