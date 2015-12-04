@@ -56,6 +56,15 @@ public:
                unsigned sid, 
                unsigned tpc, 
                const class memory_config *config );
+
+    mem_fetch( const mem_access_t &access, 
+               const warp_inst_t *inst,
+               unsigned ctrl_size, 
+               unsigned wid,
+               int warpsplit_id,
+               unsigned sid, 
+               unsigned tpc, 
+               const class memory_config *config );
    ~mem_fetch();
 
    void set_status( enum mem_fetch_status status, unsigned long long cycle );
@@ -89,6 +98,7 @@ public:
    unsigned get_sid() const { return m_sid; }
    unsigned get_tpc() const { return m_tpc; }
    unsigned get_wid() const { return m_wid; }
+   int get_warpsplit_id() const { return m_warpsplit_id; }
    bool istexture() const;
    bool isconst() const;
    enum mf_type get_type() const { return m_type; }
@@ -117,6 +127,7 @@ private:
    unsigned m_sid;
    unsigned m_tpc;
    unsigned m_wid;
+   int m_warpsplit_id;
 
    // where is this request now?
    enum mem_fetch_status m_status;

@@ -239,15 +239,17 @@ bool has_no_warpsplits(){
 
     void ibuffer_fill( unsigned slot, const warp_inst_t *pI )
     {
-       assert(slot < IBUFFER_SIZE );
-       m_ibuffer[slot].m_inst=pI;
-       m_ibuffer[slot].m_valid=true;
-       m_next=0; 
+        assert(slot < IBUFFER_SIZE );
+        m_ibuffer[slot].m_inst=pI;
+        m_ibuffer[slot].m_valid=true;
+        m_next=0; 
 
-       if(right_warpsplit)
+        /* 
+        if(right_warpsplit)
             right_warpsplit->ibuffer_fill(slot, pI);
         if(left_warpsplit)
             left_warpsplit->ibuffer_fill(slot, pI);
+        */
     }
     bool ibuffer_empty() const
     {

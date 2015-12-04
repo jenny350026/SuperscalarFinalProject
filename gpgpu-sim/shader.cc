@@ -632,41 +632,54 @@ void shader_core_ctx::fetch()
             }
 
             // this code fetches instructions from the i-cache or generates memory requests
-            if( !m_warp[warp_id].functional_done() && !m_warp[warp_id].imiss_pending() && m_warp[warp_id].ibuffer_empty() ) {
-                address_type pc  = m_warp[warp_id].get_pc();
-                address_type ppc = pc + PROGRAM_MEM_START;
-                unsigned nbytes=16; 
-                unsigned offset_in_block = pc & (m_config->m_L1I_config.get_line_sz()-1);
-                if( (offset_in_block+nbytes) > m_config->m_L1I_config.get_line_sz() )
-                    nbytes = (m_config->m_L1I_config.get_line_sz()-offset_in_block);
 
-                // TODO: replace with use of allocator
-                // mem_fetch *mf = m_mem_fetch_allocator->alloc()
-                mem_access_t acc(INST_ACC_R,ppc,nbytes,false);
-                mem_fetch *mf = new mem_fetch(acc,
-                                              NULL/*we don't have an instruction yet*/,
-                                              READ_PACKET_SIZE,
-                                              warp_id,
-                                              m_sid,
-                                              m_tpc,
-                                              m_memory_config );
-                std::list<cache_event> events;
-                enum cache_request_status status = m_L1I->access( (new_addr_type)ppc, mf, gpu_sim_cycle+gpu_tot_sim_cycle,events);
-                if( status == MISS ) {
-                    m_last_warp_fetched=warp_id;
-                    m_warp[warp_id].set_imiss_pending();
-                    m_warp[warp_id].set_last_fetch(gpu_sim_cycle);
-                } else if( status == HIT ) {
-                    m_last_warp_fetched=warp_id;
-                    m_inst_fetch_buffer = ifetch_buffer_t(pc,nbytes,warp_id);
-                    m_warp[warp_id].set_last_fetch(gpu_sim_cycle);
-                    delete mf;
-                } else {
-                    m_last_warp_fetched=warp_id;
-                    assert( status == RESERVATION_FAIL );
-                    delete mf;
+            // fetching for warpsplits if any
+            std::vector<shd_warp_t*> temp;
+            if(m_warp[warp_id].has_warpsplits()){
+                temp.push_back(m_warp[warp_id].get_right_warpsplit());
+                temp.push_back(m_warp[warp_id].get_left_warpsplit());
+            }
+            else
+                temp.push_back(&m_warp[warp_id]);
+
+            for(uint32_t i = 0; i < temp.size(); ++i){
+                if( !temp[i]->functional_done() && !temp[i]->imiss_pending() && temp[i]->ibuffer_empty() ) {
+                    address_type pc  = temp[i]->get_pc();
+                    address_type ppc = pc + PROGRAM_MEM_START;
+                    unsigned nbytes=16; 
+                    unsigned offset_in_block = pc & (m_config->m_L1I_config.get_line_sz()-1);
+                    if( (offset_in_block+nbytes) > m_config->m_L1I_config.get_line_sz() )
+                        nbytes = (m_config->m_L1I_config.get_line_sz()-offset_in_block);
+
+                    // TODO: replace with use of allocator
+                    // mem_fetch *mf = m_mem_fetch_allocator->alloc()
+                    mem_access_t acc(INST_ACC_R,ppc,nbytes,false);
+                    mem_fetch *mf = new mem_fetch(acc,
+                                                  NULL/*we don't have an instruction yet*/,
+                                                  READ_PACKET_SIZE,
+                                                  warp_id,
+                                                  temp[i]->get_warpsplit_id(),
+                                                  m_sid,
+                                                  m_tpc,
+                                                  m_memory_config );
+                    std::list<cache_event> events;
+                    enum cache_request_status status = m_L1I->access( (new_addr_type)ppc, mf, gpu_sim_cycle+gpu_tot_sim_cycle,events);
+                    if( status == MISS ) {
+                        m_last_warp_fetched=warp_id;
+                        temp[i]->set_imiss_pending();
+                        temp[i]->set_last_fetch(gpu_sim_cycle);
+                    } else if( status == HIT ) {
+                        m_last_warp_fetched=warp_id;
+                        m_inst_fetch_buffer = ifetch_buffer_t(pc,nbytes,warp_id);
+                        temp[i]->set_last_fetch(gpu_sim_cycle);
+                        delete mf;
+                    } else {
+                        m_last_warp_fetched=warp_id;
+                        assert( status == RESERVATION_FAIL );
+                        delete mf;
+                    }
+                    break;
                 }
-                break;
             }
         }
     }
@@ -676,7 +689,8 @@ void shader_core_ctx::fetch()
     if( m_L1I->access_ready() ) {
         mem_fetch *mf = m_L1I->next_access();
         // NOTE this is problematic... if insturction missed before the split, how do we make sure to tell both warps to clear_imiss_pending()
-        m_warp[mf->get_wid()].clear_imiss_pending();
+        // m_warp[mf->get_wid()].clear_imiss_pending();
+        warp(mf->get_wid(), mf->get_warpsplit_id()).clear_imiss_pending();
         delete mf;
     }
 }

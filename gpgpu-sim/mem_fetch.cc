@@ -61,6 +61,39 @@ mem_fetch::mem_fetch( const mem_access_t &access,
    m_status_change = gpu_sim_cycle + gpu_tot_sim_cycle;
    m_mem_config = config;
    icnt_flit_size = config->icnt_flit_size;
+   m_warpsplit_id = -1;
+}
+
+mem_fetch::mem_fetch( const mem_access_t &access, 
+                      const warp_inst_t *inst,
+                      unsigned ctrl_size, 
+                      unsigned wid,
+                      int warpsplit_id,
+                      unsigned sid, 
+                      unsigned tpc, 
+                      const class memory_config *config )
+{
+   m_request_uid = sm_next_mf_request_uid++;
+   m_access = access;
+   if( inst ) { 
+       m_inst = *inst;
+       assert( wid == m_inst.warp_id() );
+   }
+   m_data_size = access.get_size();
+   m_ctrl_size = ctrl_size;
+   m_sid = sid;
+   m_tpc = tpc;
+   m_wid = wid;
+   config->m_address_mapping.addrdec_tlx(access.get_addr(),&m_raw_addr);
+   m_partition_addr = config->m_address_mapping.partition_address(access.get_addr());
+   m_type = m_access.is_write()?WRITE_REQUEST:READ_REQUEST;
+   m_timestamp = gpu_sim_cycle + gpu_tot_sim_cycle;
+   m_timestamp2 = 0;
+   m_status = MEM_FETCH_INITIALIZED;
+   m_status_change = gpu_sim_cycle + gpu_tot_sim_cycle;
+   m_mem_config = config;
+   icnt_flit_size = config->icnt_flit_size;
+   m_warpsplit_id = warpsplit_id;
 }
 
 mem_fetch::~mem_fetch()
