@@ -363,6 +363,15 @@ public:
         return std::bitset<MAX_WARP_SIZE>((unsigned) (-1));
     }
 
+    
+    int find_warpsplit_id_by_active_mask(simt_mask_t mask){
+        for(uint32_t i = 0; i < m_table.size(); ++i)
+            if(m_table[i].m_mask == mask)
+                return i;
+
+        return -1;
+    }
+
 /*
     ~warpsplit_table(){
         for(unsigned i = 0; i < m_table.size(); ++i)
@@ -393,6 +402,8 @@ public:
     void update(int warpsplit_id, simt_mask_t &thread_done, addr_vector_t &next_pc, address_type recvg_pc, op_type next_inst_op,unsigned next_inst_size, address_type next_inst_pc );
 
     void add_warpsplit(int *index1, int *index2, std::bitset<MAX_WARP_SIZE> mask);
+
+    int find_warpsplit_id_by_active_mask(simt_mask_t mask);
 
     const simt_mask_t &get_active_mask(int warpsplit_id) const;
     const simt_mask_t &get_active_mask() const;

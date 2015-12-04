@@ -615,6 +615,10 @@ const simt_mask_t &simt_stack::get_active_mask(int warpsplit_id) const
         return m_warpsplit_table.get_mask(warpsplit_id);
 }
 
+int simt_stack::find_warpsplit_id_by_active_mask(simt_mask_t mask){
+    m_warpsplit_table.find_warpsplit_id_by_active_mask(mask);
+}
+
 const simt_mask_t &simt_stack::get_active_mask() const
 {
     assert(m_stack.size() > 0);

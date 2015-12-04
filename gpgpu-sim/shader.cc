@@ -1377,8 +1377,9 @@ void shader_core_ctx::writeback()
         // NOTE need to figure out what this part is doing and see if warp_id needs to be changed
         m_operand_collector.writeback(*pipe_reg);
         unsigned warp_id = pipe_reg->warp_id();
+        int warpsplit_id = m_simt_stack[warp_id]->find_warpsplit_id_by_active_mask(pipe_reg->get_active_mask());
         m_scoreboard->releaseRegisters( pipe_reg );
-        m_warp[warp_id].dec_inst_in_pipeline();
+        warp(warp_id, warpsplit_id).dec_inst_in_pipeline();
         warp_inst_complete(*pipe_reg);
         m_gpu->gpu_sim_insn_last_update_sid = m_sid;
         m_gpu->gpu_sim_insn_last_update = gpu_sim_cycle;
