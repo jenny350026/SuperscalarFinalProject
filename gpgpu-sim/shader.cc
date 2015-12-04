@@ -578,8 +578,8 @@ void shader_core_ctx::decode()
         address_type pc = m_inst_fetch_buffer.m_pc;
         const warp_inst_t* pI1 = ptx_fetch_inst(pc);
         // NOTE need to make sure m_inst_fetch_buffer.m_warp_id is aware of the new warp added
-        m_warp[m_inst_fetch_buffer.m_warp_id].ibuffer_fill(0,pI1);
-        m_warp[m_inst_fetch_buffer.m_warp_id].inc_inst_in_pipeline();
+        warp(m_inst_fetch_buffer.m_warp_id, m_inst_fetch_buffer.m_warpsplit_id).ibuffer_fill(0,pI1);
+        warp(m_inst_fetch_buffer.m_warp_id, m_inst_fetch_buffer.m_warpsplit_id).inc_inst_in_pipeline();
         if( pI1 ) {
             m_stats->m_num_decoded_insn[m_sid]++;
             if(pI1->oprnd_type==INT_OP){
@@ -589,8 +589,8 @@ void shader_core_ctx::decode()
             }
            const warp_inst_t* pI2 = ptx_fetch_inst(pc+pI1->isize);
            if( pI2 ) {
-               m_warp[m_inst_fetch_buffer.m_warp_id].ibuffer_fill(1,pI2);
-               m_warp[m_inst_fetch_buffer.m_warp_id].inc_inst_in_pipeline();
+               warp(m_inst_fetch_buffer.m_warp_id, m_inst_fetch_buffer.m_warpsplit_id).ibuffer_fill(1,pI2);
+               warp(m_inst_fetch_buffer.m_warp_id, m_inst_fetch_buffer.m_warpsplit_id).inc_inst_in_pipeline();
                m_stats->m_num_decoded_insn[m_sid]++;
                if(pI2->oprnd_type==INT_OP){
                    m_stats->m_num_INTdecoded_insn[m_sid]++;
@@ -670,7 +670,7 @@ void shader_core_ctx::fetch()
                         temp[i]->set_last_fetch(gpu_sim_cycle);
                     } else if( status == HIT ) {
                         m_last_warp_fetched=warp_id;
-                        m_inst_fetch_buffer = ifetch_buffer_t(pc,nbytes,warp_id);
+                        m_inst_fetch_buffer = ifetch_buffer_t(pc,nbytes,warp_id, temp[i]->get_warpsplit_id());
                         temp[i]->set_last_fetch(gpu_sim_cycle);
                         delete mf;
                     } else {
