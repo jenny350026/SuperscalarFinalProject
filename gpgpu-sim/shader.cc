@@ -1461,6 +1461,8 @@ mem_stage_stall_type ldst_unit::process_memory_access_queue( cache_t *cache, war
     mem_fetch *mf = m_mf_allocator->alloc(inst,inst.accessq_back());
     std::list<cache_event> events;
     enum cache_request_status status = cache->access(mf->get_addr(),mf,gpu_sim_cycle+gpu_tot_sim_cycle,events);
+    // TODO inst.accessq_() contains warp_mask (mem_access_t)
+    // record access status here
     return process_cache_access( cache, mf->get_addr(), inst, events, mf, status );
 }
 

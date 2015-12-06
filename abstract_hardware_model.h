@@ -357,16 +357,30 @@ public:
     }
 */
 
+    bool is_valid(int warpsplit_id) const{
+        return m_table[warpsplit_id].m_valid;
+    }
+
+    void invalidate(int warpsplit_id){
+        m_table[warpsplit_id].m_valid = false;
+    }
+
     std::bitset<MAX_WARP_SIZE> get_mask(int warpsplit_id) const{
         if(m_table[warpsplit_id].m_valid)
             return m_table[warpsplit_id].m_mask;
         return std::bitset<MAX_WARP_SIZE>((unsigned) (-1));
     }
 
+    address_type get_pc(int warpsplit_id) const{
+        assert(warpsplit_id >= 0);
+        assert(m_table[warpsplit_id].m_valid);
+        return m_table[warpsplit_id].m_pc;
+    }
+
     
     int find_warpsplit_id_by_active_mask(simt_mask_t mask){
         for(uint32_t i = 0; i < m_table.size(); ++i)
-            if(m_table[i].m_mask == mask)
+            if(m_table[i].m_valid && m_table[i].m_mask == mask)
                 return i;
 
         return -1;

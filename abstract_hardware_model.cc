@@ -610,13 +610,13 @@ const simt_mask_t &simt_stack::get_active_mask(int warpsplit_id) const
 {
     assert(m_stack.size() > 0);
     if(warpsplit_id == -1)
-        return m_stack.back().m_active_mask;
+        return get_active_mask();
     else
         return m_warpsplit_table.get_mask(warpsplit_id);
 }
 
 int simt_stack::find_warpsplit_id_by_active_mask(simt_mask_t mask){
-    m_warpsplit_table.find_warpsplit_id_by_active_mask(mask);
+    return m_warpsplit_table.find_warpsplit_id_by_active_mask(mask);
 }
 
 const simt_mask_t &simt_stack::get_active_mask() const
@@ -635,7 +635,10 @@ void simt_stack::get_pdom_stack_top_info( unsigned *pc, unsigned *rpc ) const
 void simt_stack::get_pdom_stack_top_info( unsigned *pc, unsigned *rpc ,int warpsplit_id) const
 {
    assert(m_stack.size() > 0);
-   *pc = m_stack.back().m_pc;
+   if(warpsplit_id != -1)
+       *pc = m_warpsplit_table.get_pc(warpsplit_id);
+   else
+       *pc = m_stack.back().m_pc;
    *rpc = m_stack.back().m_recvg_pc;
 }
 unsigned simt_stack::get_rp() const 
@@ -809,13 +812,20 @@ void simt_stack::update(simt_mask_t &thread_done, addr_vector_t &next_pc, addres
 
 void simt_stack::update(int warpsplit_id, simt_mask_t &thread_done, addr_vector_t &next_pc, address_type recvg_pc, op_type next_inst_op,unsigned next_inst_size, address_type next_inst_pc )
 {
+
+    if(warpsplit_id == -1){
+        update(thread_done, next_pc, recvg_pc, next_inst_op, next_inst_size, next_inst_pc);
+        return;
+    }
     assert(m_stack.size() > 0);
 
     assert( next_pc.size() == m_warp_size );
+    assert(m_warpsplit_table.is_valid(warpsplit_id));
 
-    simt_mask_t  top_active_mask = m_stack.back().m_active_mask;
+    // simt_mask_t  top_active_mask = m_stack.back().m_active_mask;
+    simt_mask_t  top_active_mask = m_warpsplit_table.get_mask(warpsplit_id);
     address_type top_recvg_pc = m_stack.back().m_recvg_pc;
-    address_type top_pc = m_stack.back().m_pc; // the pc of the instruction just executed
+    address_type top_pc = m_warpsplit_table.get_pc(warpsplit_id); // the pc of the instruction just executed
     stack_entry_type top_type = m_stack.back().m_type;
     assert(top_pc==next_inst_pc);
     assert(top_active_mask.any());
