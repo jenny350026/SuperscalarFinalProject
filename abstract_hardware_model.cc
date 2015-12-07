@@ -876,6 +876,7 @@ void simt_stack::update(int warpsplit_id, simt_mask_t &thread_done, addr_vector_
 
     address_type not_taken_pc = next_inst_pc+next_inst_size;
     assert(num_divergent_paths<=2);
+    if(num_divergent_paths == 2) std::cout<<"num divergent path " << num_divergent_paths << std::endl;
     for(unsigned i=0; i<num_divergent_paths; i++){
     	address_type tmp_next_pc = null_pc;
     	simt_mask_t tmp_active_mask;
@@ -899,6 +900,7 @@ void simt_stack::update(int warpsplit_id, simt_mask_t &thread_done, addr_vector_
     		assert(num_divergent_paths == 1);
 
             // converge warpsplit here!
+            std::cout<<"invalidating warpsplit " << warpsplit_id << " CALL OPS" << std::endl;
             m_warpsplit_table.invalidate(warpsplit_id);
 
     		simt_stack_entry new_stack_entry;
@@ -924,6 +926,7 @@ void simt_stack::update(int warpsplit_id, simt_mask_t &thread_done, addr_vector_
     		assert(num_divergent_paths == 1);
     		// m_stack.pop_back();
 
+            std::cout<<"invalidating warpsplit " << warpsplit_id << "RET OPS" << std::endl;
             m_warpsplit_table.invalidate(warpsplit_id);
             if(m_warpsplit_table.size() == 0){
     		    m_stack.pop_back();
@@ -939,12 +942,15 @@ void simt_stack::update(int warpsplit_id, simt_mask_t &thread_done, addr_vector_
             return;
     	}
 
-        m_warpsplit_table.set_pc(warpsplit_id, tmp_next_pc);
+
+        if(m_warpsplit_table.size() != 0)
+            m_warpsplit_table.set_pc(warpsplit_id, tmp_next_pc);
 
         // discard the new entry if its PC matches with reconvergence PC
         // that automatically reconverges the entry
         // If the top stack entry is CALL, dont reconverge.
         if (tmp_next_pc == top_recvg_pc && (top_type != STACK_ENTRY_TYPE_CALL)){
+            std::cout<<"invalidating warpsplit " << warpsplit_id << " rpc reached" << std::endl;
             m_warpsplit_table.invalidate(warpsplit_id);
             continue;
             // TODO send a signal back to shader to remove warp from m_supervised_warp
@@ -954,6 +960,8 @@ void simt_stack::update(int warpsplit_id, simt_mask_t &thread_done, addr_vector_
         // if this entry does not include thread from the warp, divergence occurs
         if ((num_divergent_paths>1) && !warp_diverged ) {
             warp_diverged = true;
+            std::cout<<"invalidating warpsplit " << warpsplit_id << "branch detected" << std::endl;
+            m_warpsplit_table.invalidate(warpsplit_id);
             if(m_warpsplit_table.size() == 0){
                 new_recvg_pc = recvg_pc;
                 // modify the existing top entry into a reconvergence entry in the pdom stack
@@ -965,7 +973,8 @@ void simt_stack::update(int warpsplit_id, simt_mask_t &thread_done, addr_vector_
                 }
             }
             else{
-                m_warpsplit_table.invalidate(warpsplit_id);
+                m_stack.push_back(simt_stack_entry());
+                break;
             }
         }
 

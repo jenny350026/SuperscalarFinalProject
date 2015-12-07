@@ -372,9 +372,8 @@ public:
     }
 
     const std::bitset<MAX_WARP_SIZE>& get_mask(int warpsplit_id) const{
-        if(m_table[warpsplit_id].m_valid)
-            return m_table[warpsplit_id].m_mask;
-        return std::bitset<MAX_WARP_SIZE>((unsigned) (-1));
+        assert(m_table[warpsplit_id].m_valid);
+        return m_table[warpsplit_id].m_mask;
     }
 
     address_type get_pc(int warpsplit_id) const{

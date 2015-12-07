@@ -99,12 +99,14 @@ public:
         reset(); 
     }
 
+/*
     ~shd_warp_t(){
         if(right_warpsplit)
             delete right_warpsplit;
         if(left_warpsplit)
             delete left_warpsplit;
     }
+*/
 
     //TODO copy constructor copy all fields from rhs.
     //May not even need this copy constructor since C++ built-in copy constructor copies everything by default, and we don't need any deep copies of pointer variables
@@ -122,7 +124,7 @@ public:
         if(found_warpsplit(i, &temp))
             return temp;
         else
-            return NULL;
+            return this;
     }
 
     shd_warp_t* get_right_warpsplit() const{
@@ -165,9 +167,16 @@ bool has_no_warpsplits(){
         m_last_fetch = (right_warpsplit->m_last_fetch > left_warpsplit->m_last_fetch)? right_warpsplit->m_last_fetch:left_warpsplit->m_last_fetch;
 
         m_stores_outstanding = 0;
-        m_inst_in_pipeline = 0;
+        m_inst_in_pipeline = right_warpsplit->m_inst_in_pipeline + left_warpsplit->m_inst_in_pipeline;
+        std::cout<<"deleting warpsplits" << std::endl;
+        if(right_warpsplit == NULL)
+            std::cout<<"right is NULL" << std::endl;
+        if(left_warpsplit == NULL)
+            std::cout<<"left is NULL" << std::endl;
         delete right_warpsplit;
+        right_warpsplit = NULL;
         delete left_warpsplit;
+        left_warpsplit = NULL;
     }
 
     //TODO need a function to change m_active_threads after splitting
