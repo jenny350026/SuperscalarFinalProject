@@ -710,7 +710,7 @@ void shader_core_ctx::issue_warp( register_set& pipe_reg_set, const warp_inst_t*
     warp(warp_id, warpsplit_id).ibuffer_free();
     assert(next_inst->valid());
     **pipe_reg = *next_inst; // static instruction information
-    (*pipe_reg)->issue( active_mask, warp_id, gpu_tot_sim_cycle + gpu_sim_cycle, warp(warp_id, warpsplit_id).get_dynamic_warp_id() ); // dynamic instruction information
+    (*pipe_reg)->issue( active_mask, warp_id, warpsplit_id, gpu_tot_sim_cycle + gpu_sim_cycle, warp(warp_id, warpsplit_id).get_dynamic_warp_id() ); // dynamic instruction information
     m_stats->shader_cycle_distro[2+(*pipe_reg)->active_count()]++;
     func_exec_inst( **pipe_reg );
     if( next_inst->op == BARRIER_OP ){
@@ -907,6 +907,7 @@ void scheduler_unit::cycle()
                         ready_inst = true;
                         // TODO change active mask
                         const active_mask_t &active_mask = m_simt_stack[warp_id]->get_active_mask(warpsplit_id);
+                        
 
                         /*
                         if(m_warpsplit_table.matched(*iter)){
@@ -1394,7 +1395,8 @@ void shader_core_ctx::writeback()
         // NOTE need to figure out what this part is doing and see if warp_id needs to be changed
         m_operand_collector.writeback(*pipe_reg);
         unsigned warp_id = pipe_reg->warp_id();
-        int warpsplit_id = m_simt_stack[warp_id]->find_warpsplit_id_by_active_mask(pipe_reg->get_active_mask());
+        // int warpsplit_id = m_simt_stack[warp_id]->find_warpsplit_id_by_active_mask(pipe_reg->get_active_mask());
+        int warpsplit_id = pipe_reg->warpsplit_id();
         m_scoreboard->releaseRegisters( pipe_reg );
         warp(warp_id, warpsplit_id).dec_inst_in_pipeline();
         warp_inst_complete(*pipe_reg);

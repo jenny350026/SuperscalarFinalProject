@@ -939,6 +939,8 @@ void simt_stack::update(int warpsplit_id, simt_mask_t &thread_done, addr_vector_
             return;
     	}
 
+        m_warpsplit_table.set_pc(warpsplit_id, tmp_next_pc);
+
         // discard the new entry if its PC matches with reconvergence PC
         // that automatically reconverges the entry
         // If the top stack entry is CALL, dont reconverge.
@@ -986,9 +988,6 @@ void simt_stack::update(int warpsplit_id, simt_mask_t &thread_done, addr_vector_
             } else {
                 m_stack.back().m_recvg_pc = top_recvg_pc;
             }
-        }
-        else{
-            m_warpsplit_table.set_pc(warpsplit_id, tmp_next_pc);
         }
 
         m_stack.push_back(simt_stack_entry());
