@@ -590,6 +590,14 @@ void simt_stack::add_warpsplit(int *index1, int *index2, std::bitset<MAX_WARP_SI
     m_warpsplit_table.add_warpsplit(index1, index2, m_stack.back().m_active_mask, mask, m_stack.back().m_pc, m_stack.back().m_pc);
 }
 
+bool simt_stack::warpsplit_is_valid(int warpsplit_id) const{
+    return m_warpsplit_table.is_valid(warpsplit_id);
+}
+
+int simt_stack::warpsplit_table_size() const{
+    return m_warpsplit_table.size();
+}
+
 void simt_stack::reset()
 {
     m_stack.clear();
@@ -878,6 +886,7 @@ void simt_stack::update(int warpsplit_id, simt_mask_t &thread_done, addr_vector_
     		tmp_active_mask=divergent_paths[tmp_next_pc];
     		divergent_paths.erase(tmp_next_pc);
     	}else{
+            // DOES NOT find the not_take_pc in divergent_paths
     		std::map<address_type,simt_mask_t>:: iterator it=divergent_paths.begin();
     		tmp_next_pc=it->first;
     		tmp_active_mask=divergent_paths[tmp_next_pc];
@@ -889,64 +898,107 @@ void simt_stack::update(int warpsplit_id, simt_mask_t &thread_done, addr_vector_
     		// Since call is not a divergent instruction, all threads should have executed a call instruction
     		assert(num_divergent_paths == 1);
 
+            // converge warpsplit here!
+            m_warpsplit_table.invalidate(warpsplit_id);
+
     		simt_stack_entry new_stack_entry;
     		new_stack_entry.m_pc = tmp_next_pc;
     		new_stack_entry.m_active_mask = tmp_active_mask;
     		new_stack_entry.m_branch_div_cycle = gpu_sim_cycle+gpu_tot_sim_cycle;
     		new_stack_entry.m_type = STACK_ENTRY_TYPE_CALL;
-    		m_stack.push_back(new_stack_entry);
+    		// m_stack.push_back(new_stack_entry);
+
+            if(m_warpsplit_table.size() == 0){
+                assert(new_stack_entry.m_pc == m_temp_stack_entry.m_pc);
+                assert(new_stack_entry.m_type == m_temp_stack_entry.m_type);
+                new_stack_entry.m_active_mask |= m_temp_stack_entry.m_active_mask;
+    		    m_stack.push_back(new_stack_entry);
+            }
+            else{
+                m_temp_stack_entry = new_stack_entry;
+            }
+
     		return;
     	}else if(next_inst_op == RET_OPS && top_type==STACK_ENTRY_TYPE_CALL){
     		// pop the CALL Entry
     		assert(num_divergent_paths == 1);
-    		m_stack.pop_back();
+    		// m_stack.pop_back();
 
-    		assert(m_stack.size() > 0);
-    		m_stack.back().m_pc=tmp_next_pc;// set the PC of the stack top entry to return PC from  the call stack;
-            // Check if the New top of the stack is reconverging
-            if (tmp_next_pc == m_stack.back().m_recvg_pc && m_stack.back().m_type!=STACK_ENTRY_TYPE_CALL){
-            	assert(m_stack.back().m_type==STACK_ENTRY_TYPE_NORMAL);
-            	m_stack.pop_back();
+            m_warpsplit_table.invalidate(warpsplit_id);
+            if(m_warpsplit_table.size() == 0){
+    		    m_stack.pop_back();
+    		    assert(m_stack.size() > 0);
+    		    m_stack.back().m_pc=tmp_next_pc;// set the PC of the stack top entry to return PC from  the call stack;
+                // Check if the New top of the stack is reconverging
+                if (tmp_next_pc == m_stack.back().m_recvg_pc && m_stack.back().m_type!=STACK_ENTRY_TYPE_CALL){
+                	assert(m_stack.back().m_type==STACK_ENTRY_TYPE_NORMAL);
+                	m_stack.pop_back();
+                }
             }
+
             return;
     	}
 
         // discard the new entry if its PC matches with reconvergence PC
         // that automatically reconverges the entry
         // If the top stack entry is CALL, dont reconverge.
-        if (tmp_next_pc == top_recvg_pc && (top_type != STACK_ENTRY_TYPE_CALL)) continue;
+        if (tmp_next_pc == top_recvg_pc && (top_type != STACK_ENTRY_TYPE_CALL)){
+            m_warpsplit_table.invalidate(warpsplit_id);
+            continue;
+            // TODO send a signal back to shader to remove warp from m_supervised_warp
+        }
 
         // this new entry is not converging
         // if this entry does not include thread from the warp, divergence occurs
         if ((num_divergent_paths>1) && !warp_diverged ) {
             warp_diverged = true;
-            // modify the existing top entry into a reconvergence entry in the pdom stack
-            new_recvg_pc = recvg_pc;
-            if (new_recvg_pc != top_recvg_pc) {
-                m_stack.back().m_pc = new_recvg_pc;
-                m_stack.back().m_branch_div_cycle = gpu_sim_cycle+gpu_tot_sim_cycle;
+            if(m_warpsplit_table.size() == 0){
+                new_recvg_pc = recvg_pc;
+                // modify the existing top entry into a reconvergence entry in the pdom stack
+                if (new_recvg_pc != top_recvg_pc) {
+                    m_stack.back().m_pc = new_recvg_pc;
+                    m_stack.back().m_branch_div_cycle = gpu_sim_cycle+gpu_tot_sim_cycle;
 
-                m_stack.push_back(simt_stack_entry());
+                    m_stack.push_back(simt_stack_entry());
+                }
+            }
+            else{
+                m_warpsplit_table.invalidate(warpsplit_id);
             }
         }
 
-        // discard the new entry if its PC matches with reconvergence PC
+        // NOT SURE IF I NEED TO CHANGE THIS discard the new entry if its PC matches with reconvergence PC
         if (warp_diverged && tmp_next_pc == new_recvg_pc) continue;
 
         // update the current top of pdom stack
-        m_stack.back().m_pc = tmp_next_pc;
-        m_stack.back().m_active_mask = tmp_active_mask;
-        if (warp_diverged) {
-            m_stack.back().m_calldepth = 0;
-            m_stack.back().m_recvg_pc = new_recvg_pc;
-        } else {
-            m_stack.back().m_recvg_pc = top_recvg_pc;
+        // m_stack.back().m_pc = tmp_next_pc;
+        if(m_warpsplit_table.size() == 0){
+            simt_mask_t actual_active_mask;
+            for (int i = m_warp_size - 1; i >= 0; i--) {
+                if (!thread_done.test(i) && tmp_next_pc == next_pc[i]) {
+                    actual_active_mask.set(i);
+                }
+            }
+            m_stack.back().m_active_mask = actual_active_mask;
+            if (warp_diverged) {
+                m_stack.back().m_calldepth = 0;
+                m_stack.back().m_recvg_pc = new_recvg_pc;
+            } else {
+                m_stack.back().m_recvg_pc = top_recvg_pc;
+            }
+        }
+        else{
+            m_warpsplit_table.set_pc(warpsplit_id, tmp_next_pc);
         }
 
         m_stack.push_back(simt_stack_entry());
     }
     assert(m_stack.size() > 0);
     m_stack.pop_back();
+    if(m_warpsplit_table.size() == 0){
+        // all warpsplits have converged
+        m_stack.pop_back();
+    }
 
 
     if (warp_diverged) {

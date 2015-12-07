@@ -148,6 +148,27 @@ bool has_no_warpsplits(){
         right_warpsplit = new shd_warp_t(*this);
         right_warpsplit->m_warpsplit_id = index2;
     }
+    
+    void converge(){
+        m_next_pc = left_warpsplit->m_next_pc;
+        n_completed = left_warpsplit->n_completed + right_warpsplit->n_completed;          // number of threads in warp completed
+        m_imiss_pending = left_warpsplit->m_imiss_pending && right_warpsplit->m_imiss_pending;
+    
+        m_inst_at_barrier = NULL;
+        for(unsigned i = 0; i < IBUFFER_SIZE; ++i)
+            m_ibuffer[i].m_valid = false;
+        m_next = 0;
+                                   
+        m_n_atomic = 0;
+        m_membar = false;
+
+        m_last_fetch = (right_warpsplit->m_last_fetch > left_warpsplit->m_last_fetch)? right_warpsplit->m_last_fetch:left_warpsplit->m_last_fetch;
+
+        m_stores_outstanding = 0;
+        m_inst_in_pipeline = 0;
+        delete right_warpsplit;
+        delete left_warpsplit;
+    }
 
     //TODO need a function to change m_active_threads after splitting
     void set_active_threads(std::bitset<MAX_WARP_SIZE> new_mask){
@@ -1925,7 +1946,7 @@ public:
     friend class scheduler_unit; //this is needed to use private issue warp.
     friend class TwoLevelScheduler;
     friend class LooseRoundRobbinScheduler;
-    void issue_warp( register_set& warp, const warp_inst_t *pI, const active_mask_t &active_mask, unsigned warp_id, int warpsplit_id );
+    void issue_warp( register_set& warp, const warp_inst_t *pI, const active_mask_t &active_mask, unsigned warp_id, int warpsplit_id, bool &invalidated);
     void func_exec_inst( warp_inst_t &inst );
 
      // Returns numbers of addresses in translated_addrs

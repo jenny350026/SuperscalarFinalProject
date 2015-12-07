@@ -702,7 +702,7 @@ void shader_core_ctx::func_exec_inst( warp_inst_t &inst )
         inst.generate_mem_accesses();
 }
 
-void shader_core_ctx::issue_warp( register_set& pipe_reg_set, const warp_inst_t* next_inst, const active_mask_t &active_mask, unsigned warp_id, int warpsplit_id )
+void shader_core_ctx::issue_warp( register_set& pipe_reg_set, const warp_inst_t* next_inst, const active_mask_t &active_mask, unsigned warp_id, int warpsplit_id, bool &invalidated)
 {
     warp_inst_t** pipe_reg = pipe_reg_set.get_free();
     assert(pipe_reg);
@@ -722,7 +722,12 @@ void shader_core_ctx::issue_warp( register_set& pipe_reg_set, const warp_inst_t*
         warp(warp_id, warpsplit_id).set_membar();
     }
 
+    bool warpsplit_valid = m_simt_stack[warp_id]->warpsplit_is_valid(warpsplit_id);
     updateSIMTStack(warp_id, warpsplit_id,*pipe_reg);
+    if(warpsplit_valid && !m_simt_stack[warp_id]->warpsplit_is_valid(warpsplit_id)){
+        //warpsplit is invalidated
+        invalidated = true;
+    }
     // TODO may have to change scoreboard
     m_scoreboard->reserveRegisters(*pipe_reg);
     warp(warp_id, warpsplit_id).set_next_pc(next_inst->pc + next_inst->isize);
@@ -866,6 +871,7 @@ void scheduler_unit::cycle()
         int warpsplit_id = (*iter)->get_warpsplit_id();
         unsigned checked=0;
         unsigned issued=0;
+        bool invalidated = false;
         unsigned max_issue = m_shader->m_config->gpgpu_max_insn_issue_per_warp;
  
         if(warpsplit_id!=-1){
@@ -914,7 +920,7 @@ void scheduler_unit::cycle()
                         assert( warp(warp_id, warpsplit_id).inst_in_pipeline() );
                         if ( (pI->op == LOAD_OP) || (pI->op == STORE_OP) || (pI->op == MEMORY_BARRIER_OP) ) {
                             if( m_mem_out->has_free() ) {
-                                m_shader->issue_warp(*m_mem_out,pI,active_mask,warp_id, warpsplit_id);
+                                m_shader->issue_warp(*m_mem_out,pI,active_mask,warp_id, warpsplit_id, invalidated);
                                 issued++;
                                 issued_inst=true;
                                 warp_inst_issued = true;
@@ -924,18 +930,19 @@ void scheduler_unit::cycle()
                             bool sfu_pipe_avail = m_sfu_out->has_free();
                             if( sp_pipe_avail && (pI->op != SFU_OP) ) {
                                 // always prefer SP pipe for operations that can use both SP and SFU pipelines
-                                m_shader->issue_warp(*m_sp_out,pI,active_mask,warp_id, warpsplit_id);
+                                m_shader->issue_warp(*m_sp_out,pI,active_mask,warp_id, warpsplit_id, invalidated);
                                 issued++;
                                 issued_inst=true;
                                 warp_inst_issued = true;
                             } else if ( (pI->op == SFU_OP) || (pI->op == ALU_SFU_OP) ) {
                                 if( sfu_pipe_avail ) {
-                                    m_shader->issue_warp(*m_sfu_out,pI,active_mask,warp_id, warpsplit_id);
+                                    m_shader->issue_warp(*m_sfu_out,pI,active_mask,warp_id, warpsplit_id, invalidated);
                                     issued++;
                                     issued_inst=true;
                                     warp_inst_issued = true;
                                 }
-                            }                         }
+                            }                         
+                        }
                     } else {
                         SCHED_DPRINTF( "Warp (warp_id %u, dynamic_warp_id %u) fails scoreboard\n",
                                        (*iter)->get_warp_id(), (*iter)->get_dynamic_warp_id() );
@@ -963,11 +970,21 @@ void scheduler_unit::cycle()
             // We could remove the need for this loop by associating a
             // supervised_is index with each entry in the m_next_cycle_prioritized_warps
             // vector. For now, just run through until you find the right warp_id
-            for ( std::vector< shd_warp_t* >::const_iterator supervised_iter = m_supervised_warps.begin();
+            for ( std::vector< shd_warp_t* >::iterator supervised_iter = m_supervised_warps.begin();
                   supervised_iter != m_supervised_warps.end();
                   ++supervised_iter ) {
                 if ( *iter == *supervised_iter ) {
-                    m_last_supervised_issued = supervised_iter;
+                    if(invalidated){
+                        m_supervised_warps.erase(supervised_iter);
+                        m_last_supervised_issued = supervised_iter+1;
+                        if(m_simt_stack[warp_id]->warpsplit_table_size() == 0){
+                            (*m_warp)[warp_id].converge();
+                            m_supervised_warps.push_back(&(*m_warp)[warp_id]);
+                        }
+                    }
+                    else
+                        m_last_supervised_issued = supervised_iter;
+                    break;
                 }
             }
     	    n_cyc_issue++;

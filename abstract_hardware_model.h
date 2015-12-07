@@ -345,7 +345,12 @@ public:
     }
 
     int size() const {
-        return m_table.size();
+        int count = 0;
+        for(uint32_t i = 0; i < m_table.size(); ++i)
+            if(m_table[i].m_valid)
+                ++count;
+        
+        return count;
     }
 
 /*
@@ -375,6 +380,12 @@ public:
         assert(warpsplit_id >= 0);
         assert(m_table[warpsplit_id].m_valid);
         return m_table[warpsplit_id].m_pc;
+    }
+
+    void set_pc(int warpsplit_id, address_type pc){
+        assert(warpsplit_id >= 0);
+        assert(m_table[warpsplit_id].m_valid);
+        m_table[warpsplit_id].m_pc = pc;
     }
 
     
@@ -419,6 +430,9 @@ public:
 
     int find_warpsplit_id_by_active_mask(simt_mask_t mask);
 
+    bool warpsplit_is_valid(int warpsplit_id) const;
+    int warpsplit_table_size() const;
+
     const simt_mask_t &get_active_mask(int warpsplit_id) const;
     const simt_mask_t &get_active_mask() const;
     void     get_pdom_stack_top_info( unsigned *pc, unsigned *rpc ) const;
@@ -449,6 +463,7 @@ protected:
     std::deque<simt_stack_entry> m_stack;
 
     warpsplit_table m_warpsplit_table;
+    simt_stack_entry m_temp_stack_entry;
 
 };
 
