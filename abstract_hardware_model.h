@@ -66,6 +66,7 @@ enum FuncCache
 
 #include <string.h>
 #include <stdio.h>
+#include <iostream>
 
 typedef unsigned long long new_addr_type;
 typedef unsigned address_type;
@@ -370,7 +371,7 @@ public:
         m_table[warpsplit_id].m_valid = false;
     }
 
-    std::bitset<MAX_WARP_SIZE> get_mask(int warpsplit_id) const{
+    const std::bitset<MAX_WARP_SIZE>& get_mask(int warpsplit_id) const{
         if(m_table[warpsplit_id].m_valid)
             return m_table[warpsplit_id].m_mask;
         return std::bitset<MAX_WARP_SIZE>((unsigned) (-1));
@@ -390,10 +391,12 @@ public:
 
     
     int find_warpsplit_id_by_active_mask(simt_mask_t mask){
-        for(uint32_t i = 0; i < m_table.size(); ++i)
+        std::cout<<"candidate mask "<<mask<<std::endl;
+        for(uint32_t i = 0; i < m_table.size(); ++i){
+            std::cout<<"table mask "<<m_table[i].m_mask<<std::endl;
             if(m_table[i].m_valid && m_table[i].m_mask == mask)
                 return i;
-
+        }
         return -1;
     }
 
