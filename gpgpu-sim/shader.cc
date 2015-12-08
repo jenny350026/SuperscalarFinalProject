@@ -643,14 +643,21 @@ void shader_core_ctx::fetch()
             // fetching for warpsplits if any
             std::vector<shd_warp_t*> temp;
             if(m_warp[warp_id].has_warpsplits()){
-                temp.push_back(m_warp[warp_id].get_right_warpsplit());
-                temp.push_back(m_warp[warp_id].get_left_warpsplit());
+                if(m_simt_stack[warp_id]->warpsplit_is_valid(m_warp[warp_id].get_right_warpsplit()->get_warpsplit_id())){
+                    temp.push_back(m_warp[warp_id].get_right_warpsplit());
+                }
+                if(m_simt_stack[warp_id]->warpsplit_is_valid(m_warp[warp_id].get_left_warpsplit()->get_warpsplit_id())){
+                    temp.push_back(m_warp[warp_id].get_left_warpsplit());
+                }
             }
             else
                 temp.push_back(&m_warp[warp_id]);
 
+            bool fetched = false;
+
             for(uint32_t i = 0; i < temp.size(); ++i){
                 if( !temp[i]->functional_done() && !temp[i]->imiss_pending() && temp[i]->ibuffer_empty() ) {
+                    fetched = true;
                     address_type pc  = temp[i]->get_pc();
                     address_type ppc = pc + PROGRAM_MEM_START;
                     unsigned nbytes=16; 
@@ -688,6 +695,8 @@ void shader_core_ctx::fetch()
                     break;
                 }
             }
+            if(fetched)
+                break;
         }
     }
 
@@ -747,6 +756,18 @@ void shader_core_ctx::issue(){
         schedulers[i]->cycle();
     }
 }
+
+void shd_warp_t::create_warpsplit(unsigned index1, unsigned index2, std::bitset<MAX_WARP_SIZE> mask){
+        m_warpsplit_id = -1;
+        left_warpsplit = new shd_warp_t(*this);
+        left_warpsplit->m_warpsplit_id = index1;
+        std::cout<< "left inst in pipeline " << left_warpsplit->m_inst_in_pipeline << std::endl;
+
+        right_warpsplit = new shd_warp_t(*this);
+        right_warpsplit->m_warpsplit_id = index2;
+        std::cout<< "right inst in pipeline " << right_warpsplit->m_inst_in_pipeline << std::endl;
+}
+
 shd_warp_t& shader_core_ctx::warp(int i, int warpsplit_id){
     if(warpsplit_id == -1)
         return m_warp[i];

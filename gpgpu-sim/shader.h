@@ -142,16 +142,7 @@ bool has_no_warpsplits(){
         return left_warpsplit != NULL && right_warpsplit != NULL;
     }
 
-    void create_warpsplit(unsigned index1, unsigned index2, std::bitset<MAX_WARP_SIZE> mask){
-        m_warpsplit_id = -1;
-        left_warpsplit = new shd_warp_t(*this);
-        left_warpsplit->m_warpsplit_id = index1;
-        left_warpsplit->m_inst_in_pipeline = 0;
-
-        right_warpsplit = new shd_warp_t(*this);
-        right_warpsplit->m_warpsplit_id = index2;
-        right_warpsplit->m_inst_in_pipeline = 0;
-    }
+    void create_warpsplit(unsigned index1, unsigned index2, std::bitset<MAX_WARP_SIZE> mask);
     
     void converge(){
         m_next_pc = left_warpsplit->m_next_pc;
@@ -336,8 +327,13 @@ bool has_no_warpsplits(){
     void inc_inst_in_pipeline() { m_inst_in_pipeline++; }
     void dec_inst_in_pipeline() 
     {
+        //std::cout << m_warpsplit_id <<  " m_inst_in_pipeline " << m_inst_in_pipeline << std::endl;
         assert( m_inst_in_pipeline > 0 );
         m_inst_in_pipeline--;
+        //if(right_warpsplit)
+        //    right_warpsplit->dec_inst_in_pipeline();
+        //if(left_warpsplit)
+        //    left_warpsplit->dec_inst_in_pipeline();
     }
 
     unsigned get_cta_id() const { return m_cta_id; }
