@@ -580,6 +580,7 @@ void shader_core_ctx::decode()
         // NOTE need to make sure m_inst_fetch_buffer.m_warp_id is aware of the new warp added
         warp(m_inst_fetch_buffer.m_warp_id, m_inst_fetch_buffer.m_warpsplit_id).ibuffer_fill(0,pI1);
         warp(m_inst_fetch_buffer.m_warp_id, m_inst_fetch_buffer.m_warpsplit_id).inc_inst_in_pipeline();
+        warp(m_inst_fetch_buffer.m_warp_id, m_inst_fetch_buffer.m_warpsplit_id).inc_inst_decoded();
         if( pI1 ) {
             m_stats->m_num_decoded_insn[m_sid]++;
             if(pI1->oprnd_type==INT_OP){
@@ -626,7 +627,7 @@ void shader_core_ctx::fetch()
                     if( m_threadState[tid].m_active == true ) {
                         m_threadState[tid].m_active = false; 
                         unsigned cta_id = m_warp[warp_id].get_cta_id();
-                        if (warp_id == 0) std::cout<<"warp 0 done"<<std::endl;
+                        //if (warp_id == 0) std::cout<<"warp 0 done"<<std::endl;
                         register_cta_thread_exit(cta_id);
                         m_not_completed -= 1;
                         m_active_threads.reset(tid);
@@ -643,12 +644,14 @@ void shader_core_ctx::fetch()
             // fetching for warpsplits if any
             std::vector<shd_warp_t*> temp;
             if(m_warp[warp_id].has_warpsplits()){
-                if(m_simt_stack[warp_id]->warpsplit_is_valid(m_warp[warp_id].get_right_warpsplit()->get_warpsplit_id())){
+                //if(m_simt_stack[warp_id]->warpsplit_is_valid(m_warp[warp_id].get_right_warpsplit()->get_warpsplit_id())){
+                //    std::cout<<"fetching right"<<std::endl;
                     temp.push_back(m_warp[warp_id].get_right_warpsplit());
-                }
-                if(m_simt_stack[warp_id]->warpsplit_is_valid(m_warp[warp_id].get_left_warpsplit()->get_warpsplit_id())){
+                //}
+                //if(m_simt_stack[warp_id]->warpsplit_is_valid(m_warp[warp_id].get_left_warpsplit()->get_warpsplit_id())){
                     temp.push_back(m_warp[warp_id].get_left_warpsplit());
-                }
+                //    std::cout<<"fetching left"<<std::endl;
+                //}
             }
             else
                 temp.push_back(&m_warp[warp_id]);
@@ -748,6 +751,7 @@ void shader_core_ctx::issue_warp( register_set& pipe_reg_set, const warp_inst_t*
     // TODO may have to change scoreboard
     m_scoreboard->reserveRegisters(*pipe_reg);
     warp(warp_id, warpsplit_id).set_next_pc(next_inst->pc + next_inst->isize);
+    warp(warp_id, warpsplit_id).dec_inst_decoded();
 }
 
 void shader_core_ctx::issue(){
@@ -761,10 +765,12 @@ void shd_warp_t::create_warpsplit(unsigned index1, unsigned index2, std::bitset<
         m_warpsplit_id = -1;
         left_warpsplit = new shd_warp_t(*this);
         left_warpsplit->m_warpsplit_id = index1;
+        left_warpsplit->m_inst_decoded = 0;
         std::cout<< "left inst in pipeline " << left_warpsplit->m_inst_in_pipeline << std::endl;
 
         right_warpsplit = new shd_warp_t(*this);
         right_warpsplit->m_warpsplit_id = index2;
+        right_warpsplit->m_inst_decoded = 0;
         std::cout<< "right inst in pipeline " << right_warpsplit->m_inst_in_pipeline << std::endl;
 }
 
@@ -3062,13 +3068,11 @@ bool shd_warp_t::functional_done() const
 
 bool shd_warp_t::hardware_done() const
 {
-/*
     if(m_warp_id == 0){
-    std::cout<< "functional_done " << functional_done() << std::endl;
-    std::cout << "stores_done " << stores_done() << std::endl;
-    std::cout << "inst_in_pipeline " << m_inst_in_pipeline << std::endl;
+    //std::cout<< "functional_done " << functional_done() << std::endl;
+    //std::cout << "stores_done " << stores_done() << std::endl;
+    //std::cout << "inst_in_pipeline " << m_inst_in_pipeline << std::endl;
     }
-*/
     return functional_done() && stores_done() && !inst_in_pipeline(); 
 }
 

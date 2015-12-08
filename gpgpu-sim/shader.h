@@ -147,7 +147,7 @@ bool has_no_warpsplits(){
     void converge(){
         m_next_pc = left_warpsplit->m_next_pc;
         n_completed = left_warpsplit->n_completed + right_warpsplit->n_completed;          // number of threads in warp completed
-        m_imiss_pending = left_warpsplit->m_imiss_pending && right_warpsplit->m_imiss_pending;
+        m_imiss_pending = false;
     
         m_inst_at_barrier = NULL;
         for(unsigned i = 0; i < IBUFFER_SIZE; ++i)
@@ -160,7 +160,8 @@ bool has_no_warpsplits(){
         m_last_fetch = (right_warpsplit->m_last_fetch > left_warpsplit->m_last_fetch)? right_warpsplit->m_last_fetch:left_warpsplit->m_last_fetch;
 
         m_stores_outstanding = 0;
-        m_inst_in_pipeline = right_warpsplit->m_inst_in_pipeline + left_warpsplit->m_inst_in_pipeline;
+        m_inst_in_pipeline = right_warpsplit->m_inst_in_pipeline + left_warpsplit->m_inst_in_pipeline - right_warpsplit->m_inst_decoded - left_warpsplit->m_inst_decoded;
+        assert(m_inst_in_pipeline >= 0);
         std::cout<<"right " << right_warpsplit->m_inst_in_pipeline << std::endl;
         std::cout<<"left " << left_warpsplit->m_inst_in_pipeline << std::endl;
         if(right_warpsplit == NULL)
@@ -323,6 +324,8 @@ bool has_no_warpsplits(){
     }
     unsigned num_inst_in_pipeline() const { return m_inst_in_pipeline;}
     unsigned num_issued_inst_in_pipeline() const {return (num_inst_in_pipeline()-num_inst_in_buffer());}
+    void inc_inst_decoded() { m_inst_decoded++; }
+    void dec_inst_decoded() { m_inst_decoded--; }
     bool inst_in_pipeline() const { return m_inst_in_pipeline > 0; }
     void inc_inst_in_pipeline() { m_inst_in_pipeline++; }
     void dec_inst_in_pipeline() 
@@ -376,6 +379,7 @@ private:
 
     unsigned m_stores_outstanding; // number of store requests sent but not yet acknowledged
     unsigned m_inst_in_pipeline;
+    unsigned m_inst_decoded;
 
     shd_warp_t *right_warpsplit;
     shd_warp_t *left_warpsplit;
