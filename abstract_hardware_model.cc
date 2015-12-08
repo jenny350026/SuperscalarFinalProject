@@ -1018,12 +1018,12 @@ void simt_stack::update(int warpsplit_id, simt_mask_t &thread_done, addr_vector_
     if(m_warpsplit_table.size() == 0){
         std::cout << "tos next pc " << m_stack.back().m_pc << " mask " << m_stack.back().m_active_mask << std::endl;
     }
+*/
     
     std::cout<<"simt stack" << std::endl;
     for(unsigned i = 0; i < m_stack.size(); ++i){
         std::cout << m_stack[i].m_pc << " " << m_stack[i].m_active_mask << " " << m_stack[i].m_recvg_pc << std::endl;
     }
-*/
 
 
     if (warp_diverged) {

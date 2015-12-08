@@ -139,19 +139,19 @@ bool has_no_warpsplits(){
 }
 
     bool has_warpsplits(){
-        return left_warpsplit != NULL && right_warpsplit != NULL;
+        return left_warpsplit != NULL || right_warpsplit != NULL;
     }
 
     void create_warpsplit(unsigned index1, unsigned index2, std::bitset<MAX_WARP_SIZE> mask);
     
-    void converge(){
+    void converge(int count){
         m_next_pc = left_warpsplit->m_next_pc;
         n_completed = left_warpsplit->n_completed + right_warpsplit->n_completed;          // number of threads in warp completed
         m_imiss_pending = false;
     
         m_inst_at_barrier = NULL;
-        for(unsigned i = 0; i < IBUFFER_SIZE; ++i)
-            m_ibuffer[i].m_valid = false;
+        ibuffer_flush();
+        if(m_warp_id == 4) std::cout<<"converge buffer " << ibuffer_empty() << std::endl;
         m_next = 0;
                                    
         m_n_atomic = 0;
@@ -160,10 +160,14 @@ bool has_no_warpsplits(){
         m_last_fetch = (right_warpsplit->m_last_fetch > left_warpsplit->m_last_fetch)? right_warpsplit->m_last_fetch:left_warpsplit->m_last_fetch;
 
         m_stores_outstanding = 0;
-        m_inst_in_pipeline = right_warpsplit->m_inst_in_pipeline + left_warpsplit->m_inst_in_pipeline - right_warpsplit->m_inst_decoded - left_warpsplit->m_inst_decoded;
+        m_inst_in_pipeline =  count;
+        //m_inst_in_pipeline = right_warpsplit->m_inst_in_pipeline + left_warpsplit->m_inst_in_pipeline - right_warpsplit->m_inst_decoded - left_warpsplit->m_inst_decoded;
         assert(m_inst_in_pipeline >= 0);
+        //std::cout<<"right " << right_warpsplit->m_inst_decoded << std::endl;
+        //std::cout<<"left " << left_warpsplit->m_inst_decoded << std::endl;
         std::cout<<"right " << right_warpsplit->m_inst_in_pipeline << std::endl;
         std::cout<<"left " << left_warpsplit->m_inst_in_pipeline << std::endl;
+        std::cout<<"num_in_pipline " << count << std::endl;
         if(right_warpsplit == NULL)
             std::cout<<"right is NULL" << std::endl;
         if(left_warpsplit == NULL)
@@ -242,7 +246,7 @@ bool has_no_warpsplits(){
     unsigned get_n_completed() const { return n_completed; }
     void set_completed( unsigned lane ) 
     { 
-        //assert( m_active_threads.test(lane) );
+        //assertm_active_threads.test(lane) );
         m_active_threads.reset(lane);
         n_completed++; 
     }
@@ -324,8 +328,8 @@ bool has_no_warpsplits(){
     }
     unsigned num_inst_in_pipeline() const { return m_inst_in_pipeline;}
     unsigned num_issued_inst_in_pipeline() const {return (num_inst_in_pipeline()-num_inst_in_buffer());}
-    void inc_inst_decoded() { m_inst_decoded++; }
-    void dec_inst_decoded() { m_inst_decoded--; }
+    //void inc_inst_decoded() { m_inst_decoded++; }
+    //void dec_inst_decoded() { assert(m_inst_decoded > 0); m_inst_decoded--; }
     bool inst_in_pipeline() const { return m_inst_in_pipeline > 0; }
     void inc_inst_in_pipeline() { m_inst_in_pipeline++; }
     void dec_inst_in_pipeline() 
@@ -1810,6 +1814,7 @@ public:
     void inc_store_req( unsigned warp_id) { m_warp[warp_id].inc_store_req(); }
     void dec_inst_in_pipeline( unsigned warp_id ) { m_warp[warp_id].dec_inst_in_pipeline(); } // also used in writeback()
     void dec_inst_in_pipeline( unsigned warp_id, int warpsplit_id ) { warp(warp_id, warpsplit_id).dec_inst_in_pipeline(); } // also used in writeback()
+    int num_in_pipeline(unsigned warp_id) const;
     void store_ack( class mem_fetch *mf );
     bool warp_waiting_at_mem_barrier( unsigned warp_id );
     void set_max_cta( const kernel_info_t &kernel );
@@ -2003,6 +2008,7 @@ public:
     // fetch
     read_only_cache *m_L1I; // instruction cache
     int  m_last_warp_fetched;
+    std::vector<int> m_last_warpsplit_fetched;
 
     // decode/dispatch
     std::vector<shd_warp_t>   m_warp;   // per warp information array

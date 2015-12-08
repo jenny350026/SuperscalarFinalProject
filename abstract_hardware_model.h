@@ -1292,6 +1292,16 @@ public:
 		return NULL;
 	}
 
+    int num_in_pipeline(unsigned warp_id) const{
+        int count = 0;
+		for( unsigned i = 0; i < regs.size(); i++ ) {
+			if( !regs[i]->empty() && regs[i]->warp_id() == warp_id ) {
+                ++count;
+			}
+		}
+       return count; 
+    }
+
 private:
 	std::vector<warp_inst_t*> regs;
 	const char* m_name;
