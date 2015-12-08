@@ -1001,7 +1001,7 @@ void simt_stack::update(int warpsplit_id, simt_mask_t &thread_done, addr_vector_
                 m_stack.back().m_recvg_pc = top_recvg_pc;
             }
 
-            //std::cout << "loop iteration " << i << " next pc " << tmp_next_pc << " mask " << actual_active_mask << std::endl;
+            std::cout << "loop iteration " << i << " next pc " << tmp_next_pc << " mask " << actual_active_mask << std::endl;
         }
 
         m_stack.push_back(simt_stack_entry());

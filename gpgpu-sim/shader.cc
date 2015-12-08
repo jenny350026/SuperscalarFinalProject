@@ -652,23 +652,20 @@ void shader_core_ctx::fetch()
 
             // fetching for warpsplits if any
             std::vector<shd_warp_t*> temp;
-
+/*
             if(warp_id == 0 && m_warp[warp_id].has_warpsplits()){
                 std::cout<<"right valid " << (m_warp[warp_id].get_right_warpsplit() && m_simt_stack[warp_id]->warpsplit_is_valid(m_warp[warp_id].get_right_warpsplit()->get_warpsplit_id())) << std::endl;
                 std::cout<<"left valid " << (m_warp[warp_id].get_left_warpsplit() && m_simt_stack[warp_id]->warpsplit_is_valid(m_warp[warp_id].get_left_warpsplit()->get_warpsplit_id())) << std::endl;
             }
+*/
             
             if(m_warp[warp_id].get_right_warpsplit() && m_simt_stack[warp_id]->warpsplit_is_valid(m_warp[warp_id].get_right_warpsplit()->get_warpsplit_id()) && m_last_warpsplit_fetched[warp_id] != m_warp[warp_id].get_right_warpsplit()->get_warpsplit_id() ){
-                //if(m_simt_stack[warp_id]->warpsplit_is_valid(m_warp[warp_id].get_right_warpsplit()->get_warpsplit_id())){
-                    std::cout<<"fetching right"<<std::endl;
+                    //std::cout<<"fetching right"<<std::endl;
                     temp.push_back(m_warp[warp_id].get_right_warpsplit());
-                //}
-                //if(m_simt_stack[warp_id]->warpsplit_is_valid(m_warp[warp_id].get_left_warpsplit()->get_warpsplit_id())){
             }
             else if(m_warp[warp_id].get_left_warpsplit() && m_simt_stack[warp_id]->warpsplit_is_valid(m_warp[warp_id].get_left_warpsplit()->get_warpsplit_id()) && m_last_warpsplit_fetched[warp_id] != m_warp[warp_id].get_left_warpsplit()->get_warpsplit_id() ){
                     temp.push_back(m_warp[warp_id].get_left_warpsplit());
-                    std::cout<<"fetching left"<<std::endl;
-                //}
+                    //std::cout<<"fetching left"<<std::endl;
             }
             else
                 temp.push_back(&m_warp[warp_id]);
@@ -676,11 +673,13 @@ void shader_core_ctx::fetch()
             bool fetched = false;
 
             for(uint32_t i = 0; i < temp.size(); ++i){
+/*
                 if(temp[i]->get_warp_id() == 0 && temp[i]->get_warpsplit_id() != -1){
                 std::cout<<"functional done " << temp[i]->functional_done() << std::endl;
                 std::cout<<"imiss pending" << temp[i]->imiss_pending() <<std::endl;
                 std::cout<<"ibuffer empty" << temp[i]->ibuffer_empty() <<std::endl;
                 }
+*/
                 
                 if( !temp[i]->functional_done() && !temp[i]->imiss_pending() && temp[i]->ibuffer_empty() ) {
                     fetched = true;
@@ -1105,13 +1104,17 @@ void scheduler_unit::cycle()
             //int warp_id = (*m_supervised_warps.begin())->get_warp_id();
             int warp_id = 0;
             //if((*m_warp)[warp_id].has_no_warpsplits()){
-            if(warp_id == 0 && (*m_warp)[warp_id].has_no_warpsplits()){
+                    std::vector< shd_warp_t* >::iterator it = m_supervised_warps.end();
+                    for ( std::vector< shd_warp_t* >::iterator supervised_iter = m_supervised_warps.begin(); supervised_iter != m_supervised_warps.end(); ++supervised_iter){
+                        if(*supervised_iter == &(*m_warp)[warp_id])
+                            it = supervised_iter;
+                    }
+            if(warp_id == 0 && it != m_supervised_warps.end() && (*m_warp)[warp_id].has_no_warpsplits()){
                 std::bitset<MAX_WARP_SIZE> new_mask = std::bitset<MAX_WARP_SIZE>(3);
                 //shd_warp_t* new_warpsplit = new shd_warp_t(m_shader->m_warp[warp_id]);
                 //new_warpsplit->set_dynamic_warp_id(m_shader->m_dynamic_warp_id++);
                 int new_warpsplit_id1 = -1, new_warpsplit_id2 = -1;
                 m_simt_stack[warp_id]->add_warpsplit(&new_warpsplit_id1, &new_warpsplit_id2, new_mask); 
-                //std::cout<<"attempting warpsplit" << std::endl;
                 if(new_warpsplit_id1 != -1 && new_warpsplit_id2 != -1){
                     std::cout<<"warp split"<<std::endl;
                     (*m_warp)[warp_id].create_warpsplit(new_warpsplit_id1, new_warpsplit_id2, new_mask);
