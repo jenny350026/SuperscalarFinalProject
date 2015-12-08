@@ -911,14 +911,12 @@ void scheduler_unit::cycle()
                         ready_inst = true;
                         // TODO change active mask
                         const active_mask_t &active_mask = m_simt_stack[warp_id]->get_active_mask(warpsplit_id);
-/*
-                        if(warpsplit_id != -1){
+                        if(warp_id == 0){
                             std::cout<<"active_mask "<<active_mask<<std::endl;
                             std::cout<<"pc "<<pc<<std::endl;
                             std::cout<<"rpc "<<rpc<<std::endl;
                             std::cout<<"warpsplit_id "<<warpsplit_id<<std::endl;
                         }
-*/
                         /*
                         if(m_warpsplit_table.matched(*iter)){
                             active_mask = temp_active_mask & m_warpsplit_table.get_mask(*iter); 
@@ -986,7 +984,7 @@ void scheduler_unit::cycle()
                   ++supervised_iter ) {
                 if ( *iter == *supervised_iter ) {
                     if(invalidated){
-                        m_last_supervised_issued = supervised_iter+1;
+                        m_last_supervised_issued = (supervised_iter+1 == m_supervised_warps.end())? m_supervised_warps.begin():supervised_iter+1;
                         std::cout<<"m_supervised_warps size before " << (m_supervised_warps).size() << std::endl;
                         std::cout << "erasing " << (*supervised_iter)->get_warpsplit_id() << std::endl;
                         m_supervised_warps.erase(supervised_iter);

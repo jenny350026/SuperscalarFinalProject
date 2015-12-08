@@ -991,21 +991,29 @@ void simt_stack::update(int warpsplit_id, simt_mask_t &thread_done, addr_vector_
                 }
             }
             m_stack.back().m_active_mask = actual_active_mask;
+            m_stack.back().m_pc = tmp_next_pc;
             if (warp_diverged) {
                 m_stack.back().m_calldepth = 0;
                 m_stack.back().m_recvg_pc = new_recvg_pc;
             } else {
                 m_stack.back().m_recvg_pc = top_recvg_pc;
             }
+
+            std::cout << "next pc " << tmp_next_pc << " mask " << actual_active_mask << std::endl;
         }
 
         m_stack.push_back(simt_stack_entry());
     }
     assert(m_stack.size() > 0);
     m_stack.pop_back();
+/*
     if(m_warpsplit_table.size() == 0){
         // all warpsplits have converged
         m_stack.pop_back();
+    }
+*/
+    if(m_warpsplit_table.size() == 0){
+        std::cout << "tos next pc " << m_stack.back().m_pc << " mask " << m_stack.back().m_active_mask << std::endl;
     }
 
 
