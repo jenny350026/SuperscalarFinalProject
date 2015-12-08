@@ -146,9 +146,11 @@ bool has_no_warpsplits(){
         m_warpsplit_id = -1;
         left_warpsplit = new shd_warp_t(*this);
         left_warpsplit->m_warpsplit_id = index1;
+        left_warpsplit->m_inst_in_pipeline = 0;
 
         right_warpsplit = new shd_warp_t(*this);
         right_warpsplit->m_warpsplit_id = index2;
+        right_warpsplit->m_inst_in_pipeline = 0;
     }
     
     void converge(){
@@ -168,7 +170,8 @@ bool has_no_warpsplits(){
 
         m_stores_outstanding = 0;
         m_inst_in_pipeline = right_warpsplit->m_inst_in_pipeline + left_warpsplit->m_inst_in_pipeline;
-        std::cout<<"deleting warpsplits" << std::endl;
+        std::cout<<"right " << right_warpsplit->m_inst_in_pipeline << std::endl;
+        std::cout<<"left " << left_warpsplit->m_inst_in_pipeline << std::endl;
         if(right_warpsplit == NULL)
             std::cout<<"right is NULL" << std::endl;
         if(left_warpsplit == NULL)
@@ -1933,8 +1936,9 @@ public:
 	 void inc_simt_to_mem(unsigned n_flits){ m_stats->n_simt_to_mem[m_sid] += n_flits; }
 	 bool check_if_non_released_reduction_barrier(warp_inst_t &inst);
 
-	private:
      shd_warp_t& warp(int i, int warpsplit_id);
+
+	private:
 	 unsigned inactive_lanes_accesses_sfu(unsigned active_count,double latency){
       return  ( ((32-active_count)>>1)*latency) + ( ((32-active_count)>>3)*latency) + ( ((32-active_count)>>3)*latency);
 	 }
