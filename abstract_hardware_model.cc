@@ -959,23 +959,32 @@ void simt_stack::update(int warpsplit_id, simt_mask_t &thread_done, addr_vector_
 
         // this new entry is not converging
         // if this entry does not include thread from the warp, divergence occurs
-        if ((next_inst_op == BRANCH_OP || num_divergent_paths>1) && !warp_diverged ) {
-            warp_diverged = true;
-            //std::cout<<"invalidating warpsplit " << warpsplit_id << "branch detected" << std::endl;
-            m_warpsplit_table.invalidate(warpsplit_id);
-            if(m_warpsplit_table.size() == 0){
-                new_recvg_pc = recvg_pc;
-                // modify the existing top entry into a reconvergence entry in the pdom stack
-                if (new_recvg_pc != top_recvg_pc) {
-                    m_stack.back().m_pc = new_recvg_pc;
-                    m_stack.back().m_branch_div_cycle = gpu_sim_cycle+gpu_tot_sim_cycle;
+        if ((next_inst_op == BRANCH_OP) && m_warpsplit_table.size()>1){
 
-                    m_stack.push_back(simt_stack_entry());
+            m_warpsplit_table.invalidate(warpsplit_id);
+            return;
+        }
+
+        if (next_inst_op == BRANCH_OP && m_warpsplit_table.size() == 1){
+            if( !warp_diverged ) {
+                warp_diverged = true;
+                //std::cout<<"invalidating warpsplit " << warpsplit_id << "branch detected" << std::endl;
+                m_warpsplit_table.invalidate(warpsplit_id);
+                if(num_divergent_paths>1){
+                    new_recvg_pc = recvg_pc;
+                    // modify the existing top entry into a reconvergence entry in the pdom stack
+                    if (new_recvg_pc != top_recvg_pc) {
+                        m_stack.back().m_pc = new_recvg_pc;
+                        m_stack.back().m_branch_div_cycle = gpu_sim_cycle+gpu_tot_sim_cycle;
+
+                        m_stack.push_back(simt_stack_entry());
+                    }
                 }
-            }
-            else{
-                m_stack.push_back(simt_stack_entry());
-                break;
+                else{
+                    m_stack.back().m_pc = tmp_next_pc;
+                    m_stack.push_back(simt_stack_entry());
+                    break;
+                }
             }
         }
 
