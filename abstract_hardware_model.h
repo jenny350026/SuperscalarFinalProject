@@ -354,6 +354,12 @@ public:
         return count;
     }
 
+    void reset(){
+        for(uint32_t i = 0; i < m_table.size(); ++i)
+            m_table[i].m_valid = false;
+
+    }
+
 /*
     bool matched(shd_warp_t* warp){
        for(unsigned i = 0; i < m_table.size(); ++i)

@@ -605,6 +605,7 @@ int simt_stack::warpsplit_table_size() const{
 void simt_stack::reset()
 {
     m_stack.clear();
+    m_warpsplit_table.reset();
 }
 
 void simt_stack::launch( address_type start_pc, const simt_mask_t &active_mask )

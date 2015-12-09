@@ -1633,10 +1633,19 @@ mem_stage_stall_type ldst_unit::process_memory_access_queue( cache_t *cache, war
     if( !cache->data_port_free() ) 
         return DATA_PORT_STALL; 
 
-    //const mem_access_t &access = inst.accessq_back();
-    mem_fetch *mf = m_mf_allocator->alloc(inst,inst.accessq_back());
+    const mem_access_t &access = inst.accessq_back();
+    mem_fetch *mf = m_mf_allocator->alloc(inst, access);
     std::list<cache_event> events;
     enum cache_request_status status = cache->access(mf->get_addr(),mf,gpu_sim_cycle+gpu_tot_sim_cycle,events);
+    std::cout<< " byte mask " <<  access.get_byte_mask() << std::endl;
+    std::bitset<MAX_WARP_SIZE> last_hit;
+    for(unsigned i = 0; i < access.get_byte_mask().size(); ++i){
+        if(access.get_byte_mask().test(i))
+            last_hit.set(i/4);
+        //if(status == HIT || status == HIT_RESERVED)
+            
+    }
+    std::cout<< " thread mask " <<  last_hit << std::endl;
     // TODO inst.accessq_() contains warp_mask (mem_access_t)
     // record access status here
     return process_cache_access( cache, mf->get_addr(), inst, events, mf, status );

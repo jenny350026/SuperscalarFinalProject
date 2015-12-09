@@ -183,6 +183,10 @@ bool has_no_warpsplits() const{
         m_last_fetch=0;
         m_next=0;
         m_inst_at_barrier=NULL;
+        delete right_warpsplit;
+        right_warpsplit = NULL;
+        delete left_warpsplit;
+        left_warpsplit = NULL;
     }
     void init( address_type start_pc,
                unsigned cta_id,
