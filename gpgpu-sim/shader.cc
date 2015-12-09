@@ -586,8 +586,10 @@ void shader_core_ctx::decode()
         address_type pc = m_inst_fetch_buffer.m_pc;
         const warp_inst_t* pI1 = ptx_fetch_inst(pc);
         // NOTE need to make sure m_inst_fetch_buffer.m_warp_id is aware of the new warp added
-        warp(m_inst_fetch_buffer.m_warp_id, m_inst_fetch_buffer.m_warpsplit_id).ibuffer_fill(0,pI1);
-        warp(m_inst_fetch_buffer.m_warp_id, m_inst_fetch_buffer.m_warpsplit_id).inc_inst_in_pipeline();
+        if(warp(m_inst_fetch_buffer.m_warp_id, m_inst_fetch_buffer.m_warpsplit_id)){
+            warp(m_inst_fetch_buffer.m_warp_id, m_inst_fetch_buffer.m_warpsplit_id)->ibuffer_fill(0,pI1);
+            warp(m_inst_fetch_buffer.m_warp_id, m_inst_fetch_buffer.m_warpsplit_id)->inc_inst_in_pipeline();
+        }
         //if(m_inst_fetch_buffer.m_warp_id == 4 && m_inst_fetch_buffer.m_warpsplit_id == -1)
             //std::cout<<"decoding parent" << std::endl;
         if( pI1 ) {
@@ -599,8 +601,10 @@ void shader_core_ctx::decode()
             }
            const warp_inst_t* pI2 = ptx_fetch_inst(pc+pI1->isize);
            if( pI2 ) {
-               warp(m_inst_fetch_buffer.m_warp_id, m_inst_fetch_buffer.m_warpsplit_id).ibuffer_fill(1,pI2);
-               warp(m_inst_fetch_buffer.m_warp_id, m_inst_fetch_buffer.m_warpsplit_id).inc_inst_in_pipeline();
+                if(warp(m_inst_fetch_buffer.m_warp_id, m_inst_fetch_buffer.m_warpsplit_id)){
+                    warp(m_inst_fetch_buffer.m_warp_id, m_inst_fetch_buffer.m_warpsplit_id)->ibuffer_fill(1,pI2);
+                    warp(m_inst_fetch_buffer.m_warp_id, m_inst_fetch_buffer.m_warpsplit_id)->inc_inst_in_pipeline();
+                }
                m_stats->m_num_decoded_insn[m_sid]++;
                if(pI2->oprnd_type==INT_OP){
                    m_stats->m_num_INTdecoded_insn[m_sid]++;
@@ -736,7 +740,9 @@ void shader_core_ctx::fetch()
         mem_fetch *mf = m_L1I->next_access();
         // NOTE this is problematic... if insturction missed before the split, how do we make sure to tell both warps to clear_imiss_pending()
         // m_warp[mf->get_wid()].clear_imiss_pending();
-        warp(mf->get_wid(), mf->get_warpsplit_id()).clear_imiss_pending();
+        if(warp(mf->get_wid(), mf->get_warpsplit_id())){
+            warp(mf->get_wid(), mf->get_warpsplit_id())->clear_imiss_pending();
+        }
         delete mf;
     }
 }
@@ -754,19 +760,20 @@ void shader_core_ctx::issue_warp( register_set& pipe_reg_set, const warp_inst_t*
     assert(pipe_reg);
     //if (warp_id == 0) std::cout<<"issuing warp 0"<<std::endl;
     
-    warp(warp_id, warpsplit_id).ibuffer_free();
+    assert(warp(warp_id, warpsplit_id) != NULL);
+    warp(warp_id, warpsplit_id)->ibuffer_free();
     assert(next_inst->valid());
     **pipe_reg = *next_inst; // static instruction information
-    (*pipe_reg)->issue( active_mask, warpsplit_id, warp_id, gpu_tot_sim_cycle + gpu_sim_cycle, warp(warp_id, warpsplit_id).get_dynamic_warp_id() ); // dynamic instruction information
+    (*pipe_reg)->issue( active_mask, warpsplit_id, warp_id, gpu_tot_sim_cycle + gpu_sim_cycle, warp(warp_id, warpsplit_id)->get_dynamic_warp_id() ); // dynamic instruction information
     m_stats->shader_cycle_distro[2+(*pipe_reg)->active_count()]++;
     func_exec_inst( **pipe_reg );
     if( next_inst->op == BARRIER_OP ){
-    	warp(warp_id, warpsplit_id).store_info_of_last_inst_at_barrier(*pipe_reg);
+    	warp(warp_id, warpsplit_id)->store_info_of_last_inst_at_barrier(*pipe_reg);
         //TODO may have to change barriers
-        m_barriers.warp_reaches_barrier(warp(warp_id, warpsplit_id).get_cta_id(),warp_id,const_cast<warp_inst_t*> (next_inst));
+        m_barriers.warp_reaches_barrier(warp(warp_id, warpsplit_id)->get_cta_id(),warp_id,const_cast<warp_inst_t*> (next_inst));
 
     }else if( next_inst->op == MEMORY_BARRIER_OP ){
-        warp(warp_id, warpsplit_id).set_membar();
+        warp(warp_id, warpsplit_id)->set_membar();
     }
 
     bool warpsplit_valid = m_simt_stack[warp_id]->warpsplit_is_valid(warpsplit_id);
@@ -777,7 +784,7 @@ void shader_core_ctx::issue_warp( register_set& pipe_reg_set, const warp_inst_t*
     }
     // TODO may have to change scoreboard
     m_scoreboard->reserveRegisters(*pipe_reg);
-    warp(warp_id, warpsplit_id).set_next_pc(next_inst->pc + next_inst->isize);
+    warp(warp_id, warpsplit_id)->set_next_pc(next_inst->pc + next_inst->isize);
 }
 
 void shader_core_ctx::issue(){
@@ -787,12 +794,51 @@ void shader_core_ctx::issue(){
     }
 }
 
+void shd_warp_t::converge(int count){
+        m_next_pc = left_warpsplit->m_next_pc;
+        n_completed = left_warpsplit->n_completed + right_warpsplit->n_completed;          // number of threads in warp completed
+        //m_imiss_pending = false;
+    
+        m_inst_at_barrier = NULL;
+        //ibuffer_flush();
+        if(m_warp_id == 4) std::cout<<"converge buffer " << ibuffer_empty() << std::endl;
+        m_next = 0;
+                                   
+        m_n_atomic = 0;
+        m_membar = false;
+
+        m_last_fetch = (right_warpsplit->m_last_fetch > left_warpsplit->m_last_fetch)? right_warpsplit->m_last_fetch:left_warpsplit->m_last_fetch;
+
+        m_stores_outstanding = 0;
+        //m_inst_in_pipeline =  count;
+        //m_inst_in_pipeline = right_warpsplit->m_inst_in_pipeline + left_warpsplit->m_inst_in_pipeline - right_warpsplit->m_inst_decoded - left_warpsplit->m_inst_decoded;
+        //right_warpsplit->ibuffer_flush();
+        //left_warpsplit->ibuffer_flush();
+        //m_inst_in_pipeline = right_warpsplit->m_inst_in_pipeline + left_warpsplit->m_inst_in_pipeline;
+        //assert(m_inst_in_pipeline >= 0);
+        //std::cout<<"right " << right_warpsplit->m_inst_decoded << std::endl;
+        //std::cout<<"left " << left_warpsplit->m_inst_decoded << std::endl;
+        std::cout<<"right " << right_warpsplit->m_inst_in_pipeline << std::endl;
+        std::cout<<"left " << left_warpsplit->m_inst_in_pipeline << std::endl;
+        std::cout<<"num_in_pipline " << count << std::endl;
+        if(right_warpsplit == NULL)
+            std::cout<<"right is NULL" << std::endl;
+        if(left_warpsplit == NULL)
+            std::cout<<"left is NULL" << std::endl;
+        delete right_warpsplit;
+        right_warpsplit = NULL;
+        delete left_warpsplit;
+        left_warpsplit = NULL;
+
+}
+
 void shd_warp_t::create_warpsplit(unsigned index1, unsigned index2, std::bitset<MAX_WARP_SIZE> mask){
         m_warpsplit_id = -1;
         left_warpsplit = new shd_warp_t(*this);
         left_warpsplit->m_warpsplit_id = index1;
         left_warpsplit->m_inst_decoded = 0;
         left_warpsplit->ibuffer_flush();
+        left_warpsplit->m_inst_in_pipeline = 0;
         left_warpsplit->m_imiss_pending = false;
         //std::cout<< "left inst in pipeline " << left_warpsplit->m_inst_in_pipeline << std::endl;
 
@@ -800,26 +846,28 @@ void shd_warp_t::create_warpsplit(unsigned index1, unsigned index2, std::bitset<
         right_warpsplit->m_warpsplit_id = index2;
         right_warpsplit->m_inst_decoded = 0;
         right_warpsplit->ibuffer_flush();
+        right_warpsplit->m_inst_in_pipeline = 0;
         right_warpsplit->m_imiss_pending = false;
         //std::cout<< "right inst in pipeline " << right_warpsplit->m_inst_in_pipeline << std::endl;
+        ibuffer_flush();
 }
 
-shd_warp_t& shader_core_ctx::warp(int i, int warpsplit_id){
+shd_warp_t* shader_core_ctx::warp(int i, int warpsplit_id){
     if(warpsplit_id == -1)
-        return m_warp[i];
+        return &m_warp[i];
     shd_warp_t *temp = m_warp[i].find_warpsplit(warpsplit_id);
     assert(temp != NULL);
-    return *temp;
+    return temp;
 }
 
-shd_warp_t& scheduler_unit::warp(int i, int warpsplit_id){
+shd_warp_t* scheduler_unit::warp(int i, int warpsplit_id){
     if(warpsplit_id == -1)
-        return (*m_warp)[i];
+        return &(*m_warp)[i];
     shd_warp_t *temp = (*m_warp)[i].find_warpsplit(warpsplit_id);
     //std::cout<<"looking for warpsplit " << warpsplit_id << std::endl;
     //std::cout<<"found warp split warpId: " << temp->get_warp_id() << " warpsplitID: " << temp->get_warpsplit_id() << std::endl;
     assert(temp != NULL);
-    return *temp;
+    return temp;
 }
 
 
@@ -948,9 +996,10 @@ void scheduler_unit::cycle()
         }
 */
         //if(warp_id == 4) std::cout<<"buffer empty " << !warp(warp_id, warpsplit_id).ibuffer_empty() << std::endl;
-       while( !warp(warp_id, warpsplit_id).waiting() && !warp(warp_id, warpsplit_id).ibuffer_empty() && (checked < max_issue) && (checked <= issued) && (issued < max_issue) ) {
-            const warp_inst_t *pI = warp(warp_id, warpsplit_id).ibuffer_next_inst();
-            bool valid = warp(warp_id, warpsplit_id).ibuffer_next_valid();
+        assert(warp(warp_id, warpsplit_id) != NULL);
+       while( !warp(warp_id, warpsplit_id)->waiting() && !warp(warp_id, warpsplit_id)->ibuffer_empty() && (checked < max_issue) && (checked <= issued) && (issued < max_issue) ) {
+            const warp_inst_t *pI = warp(warp_id, warpsplit_id)->ibuffer_next_inst();
+            bool valid = warp(warp_id, warpsplit_id)->ibuffer_next_valid();
             bool warp_inst_issued = false;
             unsigned pc,rpc;
             m_simt_stack[warp_id]->get_pdom_stack_top_info(&pc,&rpc, warpsplit_id);
@@ -967,8 +1016,8 @@ void scheduler_unit::cycle()
                     SCHED_DPRINTF( "Warp (warp_id %u, dynamic_warp_id %u) control hazard instruction flush\n",
                                    (*iter)->get_warp_id(), (*iter)->get_dynamic_warp_id() );
                     // control hazard
-                    warp(warp_id, warpsplit_id).set_next_pc(pc);
-                    warp(warp_id, warpsplit_id).ibuffer_flush();
+                    warp(warp_id, warpsplit_id)->set_next_pc(pc);
+                    warp(warp_id, warpsplit_id)->ibuffer_flush();
                 } else {
                     valid_inst = true;
                     // TODO may have to change scoreboard
@@ -1004,7 +1053,7 @@ void scheduler_unit::cycle()
                         }
                         */
                         //std::cout<<"warp_id " << warp_id << " warpsplit_id " << warpsplit_id << std::endl;
-                        assert( warp(warp_id, warpsplit_id).inst_in_pipeline() );
+                        assert( warp(warp_id, warpsplit_id)->inst_in_pipeline() );
                         if ( (pI->op == LOAD_OP) || (pI->op == STORE_OP) || (pI->op == MEMORY_BARRIER_OP) ) {
                             if( m_mem_out->has_free() ) {
                                 m_shader->issue_warp(*m_mem_out,pI,active_mask,warp_id, warpsplit_id, invalidated);
@@ -1039,8 +1088,8 @@ void scheduler_unit::cycle()
                // this case can happen after a return instruction in diverged warp
                SCHED_DPRINTF( "Warp (warp_id %u, dynamic_warp_id %u) return from diverged warp flush\n",
                               (*iter)->get_warp_id(), (*iter)->get_dynamic_warp_id() );
-               warp(warp_id, warpsplit_id).set_next_pc(pc);
-               warp(warp_id, warpsplit_id).ibuffer_flush();
+               warp(warp_id, warpsplit_id)->set_next_pc(pc);
+               warp(warp_id, warpsplit_id)->ibuffer_flush();
             }
             if(warp_inst_issued) {
                 SCHED_DPRINTF( "Warp (warp_id %u, dynamic_warp_id %u) issued %u instructions\n",
@@ -1172,8 +1221,8 @@ void scheduler_unit::do_on_warp_issued( unsigned warp_id, int warpsplit_id,
     m_stats->event_warp_issued( m_shader->get_sid(),
                                 warp_id,
                                 num_issued,
-                                warp(warp_id, warpsplit_id).get_dynamic_warp_id() );
-    warp(warp_id, warpsplit_id).ibuffer_step();
+                                warp(warp_id, warpsplit_id)->get_dynamic_warp_id() );
+    warp(warp_id, warpsplit_id)->ibuffer_step();
 }
 
 bool scheduler_unit::sort_warps_by_oldest_dynamic_id(shd_warp_t* lhs, shd_warp_t* rhs)
@@ -1511,7 +1560,8 @@ void shader_core_ctx::writeback()
         int warpsplit_id = pipe_reg->warpsplit_id();
         m_scoreboard->releaseRegisters( pipe_reg );
         //if(m_warp[warp_id].has_no_warpsplits() && warpsplit_id != -1) std::cout << "writing result for warp_id " << warp_id << " warpsplit_id " << warpsplit_id << std::endl;
-        warp(warp_id, warpsplit_id).dec_inst_in_pipeline();
+        if(warp(warp_id, warpsplit_id))
+            warp(warp_id, warpsplit_id)->dec_inst_in_pipeline();
         warp_inst_complete(*pipe_reg);
         m_gpu->gpu_sim_insn_last_update_sid = m_sid;
         m_gpu->gpu_sim_insn_last_update = gpu_sim_cycle;
