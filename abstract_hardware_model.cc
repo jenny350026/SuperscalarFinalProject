@@ -589,6 +589,8 @@ simt_stack::simt_stack( unsigned wid, unsigned warpSize) : m_warpsplit_table()
 void simt_stack::add_warpsplit(int *index1, int *index2, std::bitset<MAX_WARP_SIZE> mask){
     //std::cout<<"stack size " << m_stack.size() << std::endl;
     //std::cout<<"tos pc " << m_stack.back().m_pc << std::endl;
+    if(m_stack.size() == 0)
+        return;
     m_warpsplit_table.add_warpsplit(index1, index2, m_stack.back().m_active_mask, mask, m_stack.back().m_pc, m_stack.back().m_pc);
 }
 
@@ -900,6 +902,39 @@ void simt_stack::update(int warpsplit_id, simt_mask_t &thread_done, addr_vector_
         num_divergent_paths++;
     }
 
+    if(num_divergent_paths == 0){
+        m_warpsplit_table.invalidate(warpsplit_id);
+        top_active_mask = m_stack.back().m_active_mask;
+        while (top_active_mask.any()) {
+
+            // extract a group of threads with the same next PC among the active threads in the warp
+            address_type tmp_next_pc = null_pc;
+            simt_mask_t tmp_active_mask;
+            for (int i = m_warp_size - 1; i >= 0; i--) {
+                if ( top_active_mask.test(i) ) { // is this thread active?
+                    if (thread_done.test(i)) {
+                        top_active_mask.reset(i); // remove completed thread from active mask
+                    } else if (tmp_next_pc == null_pc) {
+                        tmp_next_pc = next_pc[i];
+                        tmp_active_mask.set(i);
+                        top_active_mask.reset(i);
+                    } else if (tmp_next_pc == next_pc[i]) {
+                        tmp_active_mask.set(i);
+                        top_active_mask.reset(i);
+                    }
+                }
+            }
+
+            if(tmp_next_pc == null_pc) {
+                assert(!top_active_mask.any()); // all threads done
+                continue;
+            }
+
+            divergent_paths[tmp_next_pc]=tmp_active_mask;
+            num_divergent_paths++;
+        }
+    }
+
 
     address_type not_taken_pc = next_inst_pc+next_inst_size;
 /*
@@ -940,7 +975,7 @@ void simt_stack::update(int warpsplit_id, simt_mask_t &thread_done, addr_vector_
     		assert(num_divergent_paths == 1);
 
             // converge warpsplit here!
-            //std::cout<<"invalidating warpsplit " << warpsplit_id << " CALL OPS" << std::endl;
+            std::cout<<"invalidating warpsplit " << warpsplit_id << " CALL OPS" << std::endl;
             m_warpsplit_table.invalidate(warpsplit_id);
 
     		simt_stack_entry new_stack_entry;
@@ -1071,6 +1106,18 @@ void simt_stack::update(int warpsplit_id, simt_mask_t &thread_done, addr_vector_
     }
     assert(m_stack.size() > 0);
     m_stack.pop_back();
+    if(m_stack.size() == 0){
+            bool all_done = true;
+            for (int j = m_warp_size - 1; j >= 0; j--) {
+                std::cout<<"pc " << next_pc[j] << std::endl;
+                if(next_pc[j] != (unsigned) -1)
+                   all_done = false; 
+            }
+            if(all_done)
+                m_stack.push_back(simt_stack_entry());
+            std::cout<<"divergent paths" << num_divergent_paths << std::endl;
+    }
+    
 /*
     if(m_warpsplit_table.size() == 0){
         // all warpsplits have converged

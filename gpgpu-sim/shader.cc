@@ -1016,7 +1016,7 @@ void scheduler_unit::cycle()
                         // TODO change active mask
                         const active_mask_t &active_mask = m_simt_stack[warp_id]->get_active_mask(warpsplit_id);
 /*
-                        if(m_shader->get_sid() == 6 && warp_id == 0){
+                        if(m_shader->get_sid() == 5 && warp_id == 0){
                         std::cout<<"issuing instrution pc " << pI->pc << std::endl;
                         std::cout<<"simt pc " << pc << std::endl;
                         std::cout<<"active_mask "<<active_mask<<std::endl;
@@ -1147,18 +1147,21 @@ void scheduler_unit::cycle()
         // TODO will have to pick the right warp to split
         //if(m_warpsplit_table.size() < m_warpsplit_table.MAX_SIZE ){
         //    std::cout<<"Warp SPLIT!!!!" << std::endl; 
-            //int warp_id = (*m_supervised_warps.begin())->get_warp_id();
-            int warp_id = 0;
+            int warp_id = (*m_supervised_warps.begin())->get_warp_id();
+            //int warp_id = 0;
             //if((*m_warp)[warp_id].has_no_warpsplits()){
+/*
                     std::vector< shd_warp_t* >::iterator it = m_supervised_warps.end();
                     for ( std::vector< shd_warp_t* >::iterator supervised_iter = m_supervised_warps.begin(); supervised_iter != m_supervised_warps.end(); ++supervised_iter){
                         if(*supervised_iter == &(*m_warp)[warp_id])
                             it = supervised_iter;
                     }
+*/
             //if(m_shader->get_sid() == 0 && warp_id == 0 && (*m_warp)[warp_id].has_no_warpsplits()){
             //if(warp_id == 0 && it != m_supervised_warps.end() && !(*m_warp)[warp_id].done_exit() && (*m_warp)[warp_id].has_no_warpsplits()){
-            if(m_shader->get_sid() == 6 && warp_id == 0 && !(*m_warp)[warp_id].done_exit() && it != m_supervised_warps.end() && (*m_warp)[warp_id].has_no_warpsplits()){
-                std::bitset<MAX_WARP_SIZE> new_mask = std::bitset<MAX_WARP_SIZE>(3);
+            //if(m_shader->get_sid() == 5 && warp_id == 0 && !(*m_warp)[warp_id].done_exit() && it != m_supervised_warps.end() && (*m_warp)[warp_id].has_no_warpsplits()){
+            if(!(*m_warp)[warp_id].done_exit() && (*m_warp)[warp_id].has_no_warpsplits()){
+                std::bitset<MAX_WARP_SIZE> new_mask = std::bitset<MAX_WARP_SIZE>(0xaaaa);
                 //shd_warp_t* new_warpsplit = new shd_warp_t(m_shader->m_warp[warp_id]);
                 //new_warpsplit->set_dynamic_warp_id(m_shader->m_dynamic_warp_id++);
                 int new_warpsplit_id1 = -1, new_warpsplit_id2 = -1;

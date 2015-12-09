@@ -1033,8 +1033,8 @@ void shader_core_ctx::mem_instruction_stats(const warp_inst_t &inst)
         else 
             m_stats->gpgpu_n_load_insn += active_count;
         break;
-    default:
-        abort();
+    //default:
+        //abort();
     }
 }
 

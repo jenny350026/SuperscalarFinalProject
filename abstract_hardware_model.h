@@ -384,7 +384,7 @@ public:
 
     void set_pc(int warpsplit_id, address_type pc){
         assert(warpsplit_id >= 0);
-        assert(m_table[warpsplit_id].m_valid);
+        //assert(m_table[warpsplit_id].m_valid);
         m_table[warpsplit_id].m_pc = pc;
     }
 
