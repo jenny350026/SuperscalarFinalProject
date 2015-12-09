@@ -426,7 +426,7 @@ public:
     void reset();
     void launch( address_type start_pc, const simt_mask_t &active_mask );
     void update(simt_mask_t &thread_done, addr_vector_t &next_pc, address_type recvg_pc, op_type next_inst_op,unsigned next_inst_size, address_type next_inst_pc );
-    void update(int warpsplit_id, simt_mask_t &thread_done, addr_vector_t &next_pc, address_type recvg_pc, op_type next_inst_op,unsigned next_inst_size, address_type next_inst_pc );
+    void update(int warpsplit_id, simt_mask_t &thread_done, addr_vector_t &next_pc, address_type recvg_pc, op_type next_inst_op,unsigned next_inst_size, address_type next_inst_pcu, unsigned, unsigned);
 
     void add_warpsplit(int *index1, int *index2, std::bitset<MAX_WARP_SIZE> mask);
 
@@ -1197,7 +1197,7 @@ class core_t {
         class gpgpu_sim * get_gpu() {return m_gpu;}
         void execute_warp_inst_t(warp_inst_t &inst, unsigned warpId =(unsigned)-1);
         bool  ptx_thread_done( unsigned hw_thread_id ) const ;
-        void updateSIMTStack(unsigned warpId, int warpsplit_id, warp_inst_t * inst);
+        void updateSIMTStack(unsigned warpId, int warpsplit_id, warp_inst_t * inst, unsigned);
         void updateSIMTStack(unsigned warpId, warp_inst_t * inst);
         void initilizeSIMTStack(unsigned warp_count, unsigned warps_size);
         void deleteSIMTStack();

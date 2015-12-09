@@ -744,6 +744,7 @@ void shader_core_ctx::fetch()
 
 void shader_core_ctx::func_exec_inst( warp_inst_t &inst )
 {
+    //std::cout<<"core " << m_sid << std::endl;
     execute_warp_inst_t(inst);
     if( inst.is_load() || inst.is_store() )
         inst.generate_mem_accesses();
@@ -771,7 +772,7 @@ void shader_core_ctx::issue_warp( register_set& pipe_reg_set, const warp_inst_t*
     }
 
     bool warpsplit_valid = m_simt_stack[warp_id]->warpsplit_is_valid(warpsplit_id);
-    updateSIMTStack(warp_id, warpsplit_id,*pipe_reg);
+    updateSIMTStack(warp_id, warpsplit_id,*pipe_reg, m_sid);
     if(warpsplit_valid && !m_simt_stack[warp_id]->warpsplit_is_valid(warpsplit_id)){
         //warpsplit is invalidated
         invalidated = true;
@@ -1015,14 +1016,13 @@ void scheduler_unit::cycle()
                         ready_inst = true;
                         // TODO change active mask
                         const active_mask_t &active_mask = m_simt_stack[warp_id]->get_active_mask(warpsplit_id);
-/*
-                        if(m_shader->get_sid() == 5 && warp_id == 0){
+
+                        if(m_shader->get_sid() == 1 && warp_id == 35){
                         std::cout<<"issuing instrution pc " << pI->pc << std::endl;
                         std::cout<<"simt pc " << pc << std::endl;
                         std::cout<<"active_mask "<<active_mask<<std::endl;
                             std::cout<<"warpsplit_id "<<warpsplit_id<<std::endl;
                         }
-*/
 /*
                         if(warp_id == 0){
                             std::cout<<"active_mask "<<active_mask<<std::endl;
@@ -1168,7 +1168,8 @@ void scheduler_unit::cycle()
                     //std::cout<<"core " << m_shader->get_sid() << std::endl;
                 m_simt_stack[warp_id]->add_warpsplit(&new_warpsplit_id1, &new_warpsplit_id2, new_mask); 
                 if(new_warpsplit_id1 != -1 && new_warpsplit_id2 != -1){
-                    std::cout<<"warp split"<<std::endl;
+                    if(warp_id == 35 && m_shader->get_sid() == 1)
+                        std::cout<<"warp split"<<std::endl;
                     (*m_warp)[warp_id].create_warpsplit(new_warpsplit_id1, new_warpsplit_id2, new_mask);
                 
                     std::vector< shd_warp_t* >::iterator iter = m_supervised_warps.end();
@@ -1178,6 +1179,8 @@ void scheduler_unit::cycle()
                     }
                     
                     assert(iter != m_supervised_warps.end()); 
+                    if(*iter == *m_last_supervised_issued)
+                        m_last_supervised_issued = (iter + 1 == m_supervised_warps.end())? m_supervised_warps.begin():iter+1;
                     if(iter != m_supervised_warps.end())
                         m_supervised_warps.erase(iter);
                     assert((*m_warp)[warp_id].get_right_warpsplit());
