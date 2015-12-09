@@ -1194,6 +1194,7 @@ void ptx_thread_info::ptx_exec_inst( warp_inst_t &inst, unsigned lane_id)
    int op_classification = 0;
    addr_t pc = next_instr();
    if(pc != inst.pc){
+        std::cout<<"warp_id " << inst.warp_id() << std::endl;
         std::cout<<"functional pc " << pc << " timing pc " << inst.pc << std::endl;
         std::cout<<"lane " << lane_id << std::endl;
     }

@@ -830,7 +830,7 @@ void simt_stack::update(simt_mask_t &thread_done, addr_vector_t &next_pc, addres
     }
 }
 
-void simt_stack::update(int warpsplit_id, simt_mask_t &thread_done, addr_vector_t &next_pc, address_type recvg_pc, op_type next_inst_op,unsigned next_inst_size, address_type next_inst_pc )
+void simt_stack::update(int warpsplit_id, simt_mask_t &thread_done, addr_vector_t &next_pc, address_type recvg_pc, op_type next_inst_op,unsigned next_inst_size, address_type next_inst_pc, unsigned warp_id, unsigned m_sid )
 {
 
     if(warpsplit_id == -1){
@@ -846,10 +846,12 @@ void simt_stack::update(int warpsplit_id, simt_mask_t &thread_done, addr_vector_
         m_warpsplit_table.invalidate(warpsplit_id);
         if(m_warpsplit_table.size() == 0)
             m_stack.pop_back();
-    std::cout<<"simt stack" << std::endl;
-    for(unsigned i = 0; i < m_stack.size(); ++i){
-        std::cout << m_stack[i].m_pc << " " << m_stack[i].m_active_mask << " " << m_stack[i].m_recvg_pc << std::endl;
-    }
+        if(m_sid == 1 && warp_id == 35){
+            std::cout<<"simt stack" << std::endl;
+            for(unsigned i = 0; i < m_stack.size(); ++i){
+                std::cout << m_stack[i].m_pc << " " << m_stack[i].m_active_mask << " " << m_stack[i].m_recvg_pc << std::endl;
+            }
+        }
         return;
     }
 
@@ -1019,8 +1021,13 @@ void simt_stack::update(int warpsplit_id, simt_mask_t &thread_done, addr_vector_
     	}
 
 
-        if(m_warpsplit_table.size() != 0)
+        if(m_warpsplit_table.size() != 0){
+            if(m_sid == 1 && warp_id == 35){
+            std::cout<<"setting pc " << tmp_next_pc <<" for warpsplit " << warpsplit_id <<  std::endl;
+            }
+            
             m_warpsplit_table.set_pc(warpsplit_id, tmp_next_pc);
+        }
 
         // discard the new entry if its PC matches with reconvergence PC
         // that automatically reconverges the entry
@@ -1131,9 +1138,14 @@ void simt_stack::update(int warpsplit_id, simt_mask_t &thread_done, addr_vector_
     }
 */
     
-    std::cout<<"simt stack" << std::endl;
-    for(unsigned i = 0; i < m_stack.size(); ++i){
-        std::cout << m_stack[i].m_pc << " " << m_stack[i].m_active_mask << " " << m_stack[i].m_recvg_pc << std::endl;
+    if(m_sid == 1 && warp_id == 35){
+        std::cout<<"simt stack sid " << m_sid << " warp id " << warp_id <<   std::endl;
+        for(unsigned i = 0; i < m_stack.size(); ++i){
+            std::cout << m_stack[i].m_pc << " " << m_stack[i].m_active_mask << " " << m_stack[i].m_recvg_pc << std::endl;
+        }
+        for (int j = m_warp_size - 1; j >= 0; j--) {
+            std::cout<<"pc " << next_pc[j] << std::endl;
+        }
     }
 
     if (warp_diverged) {
@@ -1179,7 +1191,7 @@ void core_t::updateSIMTStack(unsigned warpId, warp_inst_t * inst)
     m_simt_stack[warpId]->update(thread_done,next_pc,inst->reconvergence_pc, inst->op,inst->isize,inst->pc);
 }
   
-void core_t::updateSIMTStack(unsigned warpId, int warpsplit_id, warp_inst_t * inst)
+void core_t::updateSIMTStack(unsigned warpId, int warpsplit_id, warp_inst_t * inst, unsigned m_sid)
 {
     simt_mask_t thread_done;
     addr_vector_t next_pc;
@@ -1194,7 +1206,7 @@ void core_t::updateSIMTStack(unsigned warpId, int warpsplit_id, warp_inst_t * in
             next_pc.push_back( m_thread[wtid+i]->get_pc() );
         }
     }
-    m_simt_stack[warpId]->update(warpsplit_id, thread_done,next_pc,inst->reconvergence_pc, inst->op,inst->isize,inst->pc);
+    m_simt_stack[warpId]->update(warpsplit_id, thread_done,next_pc,inst->reconvergence_pc, inst->op,inst->isize,inst->pc, warpId, m_sid);
 }
 
 //! Get the warp to be executed using the data taken form the SIMT stack

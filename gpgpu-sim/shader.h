@@ -124,7 +124,7 @@ public:
         if(found_warpsplit(i, &temp))
             return temp;
         else
-            return this;
+            return NULL;
     }
 
     shd_warp_t* get_right_warpsplit() const{
@@ -306,7 +306,7 @@ bool has_no_warpsplits() const{
     void inc_inst_in_pipeline() { m_inst_in_pipeline++; }
     void dec_inst_in_pipeline() 
     {
-        //std::cout << m_warpsplit_id <<  " m_inst_in_pipeline " << m_inst_in_pipeline << std::endl;
+        if(m_warp_id == 0) std::cout << "warp_id " << m_warp_id << " : " << m_warpsplit_id <<  " m_inst_in_pipeline " << m_inst_in_pipeline << std::endl;
         assert( m_inst_in_pipeline > 0 );
         m_inst_in_pipeline--;
         //if(right_warpsplit)
@@ -480,7 +480,7 @@ public:
         delete m_warpsplit[i];
     }
     virtual void add_supervised_warp_id(int i, int warpsplit_id) {
-        m_supervised_warps.push_back(&warp(i, warpsplit_id));
+        m_supervised_warps.push_back(warp(i, warpsplit_id));
     }
     virtual void done_adding_supervised_warps() {
         m_last_supervised_issued = m_supervised_warps.end();
@@ -529,7 +529,7 @@ protected:
                                     const std::vector< shd_warp_t* >::const_iterator& prioritized_iter );
     inline int get_sid() const;
 protected:
-    shd_warp_t& warp(int i, int warpsplit_id);
+    shd_warp_t* warp(int i, int warpsplit_id);
 
     // This is the prioritized warp list that is looped over each cycle to determine
     // which warp gets to issue.
@@ -621,9 +621,9 @@ public:
     virtual void order_warps();
 	void add_supervised_warp_id(int i, int warpsplit_id) {
         if ( m_next_cycle_prioritized_warps.size() < m_max_active_warps ) {
-            m_next_cycle_prioritized_warps.push_back( &warp(i, warpsplit_id) );
+            m_next_cycle_prioritized_warps.push_back( warp(i, warpsplit_id) );
         } else {
-		    m_pending_warps.push_back(&warp(i, warpsplit_id));
+		    m_pending_warps.push_back(warp(i, warpsplit_id));
         }
 	}
     virtual void done_adding_supervised_warps() {
@@ -1785,7 +1785,7 @@ public:
     void decrement_atomic_count( unsigned wid, unsigned n );
     void inc_store_req( unsigned warp_id) { m_warp[warp_id].inc_store_req(); }
     void dec_inst_in_pipeline( unsigned warp_id ) { m_warp[warp_id].dec_inst_in_pipeline(); } // also used in writeback()
-    void dec_inst_in_pipeline( unsigned warp_id, int warpsplit_id ) { warp(warp_id, warpsplit_id).dec_inst_in_pipeline(); } // also used in writeback()
+    void dec_inst_in_pipeline( unsigned warp_id, int warpsplit_id ) { if(warp(warp_id, warpsplit_id)) warp(warp_id, warpsplit_id)->dec_inst_in_pipeline(); } // also used in writeback()
     int num_in_pipeline(unsigned warp_id) const;
     void store_ack( class mem_fetch *mf );
     bool warp_waiting_at_mem_barrier( unsigned warp_id );
@@ -1915,7 +1915,7 @@ public:
 	 void inc_simt_to_mem(unsigned n_flits){ m_stats->n_simt_to_mem[m_sid] += n_flits; }
 	 bool check_if_non_released_reduction_barrier(warp_inst_t &inst);
 
-     shd_warp_t& warp(int i, int warpsplit_id);
+     shd_warp_t* warp(int i, int warpsplit_id);
 
 	private:
 	 unsigned inactive_lanes_accesses_sfu(unsigned active_count,double latency){
