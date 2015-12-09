@@ -1016,7 +1016,7 @@ void scheduler_unit::cycle()
                         ready_inst = true;
                         // TODO change active mask
                         const active_mask_t &active_mask = m_simt_stack[warp_id]->get_active_mask(warpsplit_id);
-                        if(warp_id == 0){
+                        if(m_shader->get_sid() ==  0 && warp_id == 0){
                         std::cout<<"issuing instrution pc " << pI->pc << std::endl;
                         std::cout<<"simt pc " << pc << std::endl;
                         std::cout<<"active_mask "<<active_mask<<std::endl;
@@ -1146,22 +1146,20 @@ void scheduler_unit::cycle()
         // TODO will have to pick the right warp to split
         //if(m_warpsplit_table.size() < m_warpsplit_table.MAX_SIZE ){
         //    std::cout<<"Warp SPLIT!!!!" << std::endl; 
-            int warp_id = (*m_supervised_warps.begin())->get_warp_id();
-            //int warp_id = 0;
+            //int warp_id = (*m_supervised_warps.begin())->get_warp_id();
+            int warp_id = 0;
             //if((*m_warp)[warp_id].has_no_warpsplits()){
-/*
                     std::vector< shd_warp_t* >::iterator it = m_supervised_warps.end();
                     for ( std::vector< shd_warp_t* >::iterator supervised_iter = m_supervised_warps.begin(); supervised_iter != m_supervised_warps.end(); ++supervised_iter){
                         if(*supervised_iter == &(*m_warp)[warp_id])
                             it = supervised_iter;
                     }
-*/
+            std::bitset<MAX_WARP_SIZE> new_mask = m_shader->get_last_hit(warp_id);
             //if(m_shader->get_sid() == 0 && warp_id == 0 && (*m_warp)[warp_id].has_no_warpsplits()){
             //if(warp_id == 0 && it != m_supervised_warps.end() && !(*m_warp)[warp_id].done_exit() && (*m_warp)[warp_id].has_no_warpsplits()){
-            //if(m_shader->get_sid() == 5 && warp_id == 0 && !(*m_warp)[warp_id].done_exit() && it != m_supervised_warps.end() && (*m_warp)[warp_id].has_no_warpsplits()){
-            if(!(*m_warp)[warp_id].done_exit() && (*m_warp)[warp_id].has_no_warpsplits()){
+            if(m_shader->get_sid() == 6 && warp_id == 0 && !(*m_warp)[warp_id].done_exit() && it != m_supervised_warps.end() && (*m_warp)[warp_id].has_no_warpsplits() && new_mask.any()){
+            //if(!(*m_warp)[warp_id].done_exit() && (*m_warp)[warp_id].has_no_warpsplits() && new_mask.any()){
                 //std::bitset<MAX_WARP_SIZE> new_mask = std::bitset<MAX_WARP_SIZE>(0xaaaa);
-                std::bitset<MAX_WARP_SIZE> new_mask = m_shader->get_last_hit(warp_id);
                 //shd_warp_t* new_warpsplit = new shd_warp_t(m_shader->m_warp[warp_id]);
                 //new_warpsplit->set_dynamic_warp_id(m_shader->m_dynamic_warp_id++);
                 int new_warpsplit_id1 = -1, new_warpsplit_id2 = -1;
@@ -1169,6 +1167,7 @@ void scheduler_unit::cycle()
                 m_simt_stack[warp_id]->add_warpsplit(&new_warpsplit_id1, &new_warpsplit_id2, new_mask); 
                 if(new_warpsplit_id1 != -1 && new_warpsplit_id2 != -1){
                     std::cout<<"warp split"<<std::endl;
+                    std::cout<<"mask " << new_mask << std::endl;
                     (*m_warp)[warp_id].create_warpsplit(new_warpsplit_id1, new_warpsplit_id2, new_mask);
                 
                     std::vector< shd_warp_t* >::iterator iter = m_supervised_warps.end();
@@ -1629,7 +1628,9 @@ void shader_core_ctx::record_last_hit(unsigned warp_id, std::bitset<MAX_WARP_SIZ
 }
 
 std::bitset<MAX_WARP_SIZE> shader_core_ctx::get_last_hit(unsigned warp_id){
-    return m_last_hits[warp_id];
+    if(warp_id < m_last_hits.size())
+        return m_last_hits[warp_id];
+    return std::bitset<MAX_WARP_SIZE>(0);
 }
 
 mem_stage_stall_type ldst_unit::process_memory_access_queue( cache_t *cache, warp_inst_t &inst )
@@ -1645,14 +1646,14 @@ mem_stage_stall_type ldst_unit::process_memory_access_queue( cache_t *cache, war
     mem_fetch *mf = m_mf_allocator->alloc(inst, access);
     std::list<cache_event> events;
     enum cache_request_status status = cache->access(mf->get_addr(),mf,gpu_sim_cycle+gpu_tot_sim_cycle,events);
-    std::cout<< " byte mask " <<  access.get_byte_mask() << std::endl;
+    //std::cout<< " byte mask " <<  access.get_byte_mask() << std::endl;
     std::bitset<MAX_WARP_SIZE> last_hit;
     for(unsigned i = 0; i < access.get_byte_mask().size(); ++i){
         if(access.get_byte_mask().test(i) && (status == HIT || status == HIT_RESERVED))
             last_hit.set(i/4);
     }
     m_core->record_last_hit(inst.warp_id(), last_hit);
-    std::cout<< " thread mask " <<  last_hit << std::endl;
+    //std::cout<< " thread mask " <<  last_hit << std::endl;
     // TODO inst.accessq_() contains warp_mask (mem_access_t)
     // record access status here
     return process_cache_access( cache, mf->get_addr(), inst, events, mf, status );

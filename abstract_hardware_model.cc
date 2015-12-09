@@ -1131,12 +1131,10 @@ void simt_stack::update(int warpsplit_id, simt_mask_t &thread_done, addr_vector_
     }
 */
     
-/*
     std::cout<<"simt stack" << std::endl;
     for(unsigned i = 0; i < m_stack.size(); ++i){
         std::cout << m_stack[i].m_pc << " " << m_stack[i].m_active_mask << " " << m_stack[i].m_recvg_pc << std::endl;
     }
-*/
 
     if (warp_diverged) {
         ptx_file_line_stats_add_warp_divergence(top_pc, 1); 
