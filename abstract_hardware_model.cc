@@ -617,15 +617,8 @@ void simt_stack::launch( address_type start_pc, const simt_mask_t &active_mask )
 const simt_mask_t &simt_stack::get_active_mask(int warpsplit_id) const
 {
     assert(m_stack.size() > 0);
-    if(warpsplit_id == -1){
-/*
-        std::cout<<"active mask" << std::endl;
-        for(unsigned i = 0; i < m_stack.size(); ++i){
-            std::cout << m_stack[i].m_pc << " " << m_stack[i].m_active_mask << " " << m_stack[i].m_recvg_pc << std::endl;
-        }
-*/
+    if(warpsplit_id == -1)
         return get_active_mask();
-    }
     else
         return m_warpsplit_table.get_mask(warpsplit_id);
 }
@@ -837,20 +830,8 @@ void simt_stack::update(int warpsplit_id, simt_mask_t &thread_done, addr_vector_
     assert( next_pc.size() == m_warp_size );
     assert(m_warpsplit_table.is_valid(warpsplit_id));
 
-    if(!m_warpsplit_table.get_mask(warpsplit_id).any()){
-        m_warpsplit_table.invalidate(warpsplit_id);
-        return;
-    }
-
-    //simt_mask_t  top_active_mask = m_stack.back().m_active_mask;
-    //simt_mask_t  top_active_mask = m_warpsplit_table.get_mask(warpsplit_id);
-    simt_mask_t  top_active_mask;
-    if(next_inst_op == BRANCH_OP){
-        top_active_mask = m_stack.back().m_active_mask;
-    }
-    else{
-        top_active_mask = m_warpsplit_table.get_mask(warpsplit_id);
-    }
+    // simt_mask_t  top_active_mask = m_stack.back().m_active_mask;
+    simt_mask_t  top_active_mask = m_warpsplit_table.get_mask(warpsplit_id);
     address_type top_recvg_pc = m_stack.back().m_recvg_pc;
     address_type top_pc = m_warpsplit_table.get_pc(warpsplit_id); // the pc of the instruction just executed
     stack_entry_type top_type = m_stack.back().m_type;
@@ -972,36 +953,22 @@ void simt_stack::update(int warpsplit_id, simt_mask_t &thread_done, addr_vector_
         if (tmp_next_pc == top_recvg_pc && (top_type != STACK_ENTRY_TYPE_CALL)){
             std::cout<<"invalidating warpsplit " << warpsplit_id << " rpc reached" << std::endl;
             m_warpsplit_table.invalidate(warpsplit_id);
-            if(m_warpsplit_table.size() == 0){
-                simt_mask_t actual_active_mask;
-                //for (int j = m_warp_size - 1; j >= 0; j--) {
-                //    std::cout<<"pc " << next_pc[j] << std::endl;
-                //    if (!thread_done.test(j) && tmp_next_pc == next_pc[j]) {
-                //        actual_active_mask.set(j);
-                //    }
-                //}
-                //std::cout<<"actual mask for branch " << actual_active_mask << std::endl;
-                //m_stack.back().m_active_mask = actual_active_mask;
-                m_stack.back().m_pc = tmp_next_pc;
-                continue;
-            }
-            return;
+            continue;
             // TODO send a signal back to shader to remove warp from m_supervised_warp
         }
 
         // this new entry is not converging
         // if this entry does not include thread from the warp, divergence occurs
-        if ((next_inst_op == BRANCH_OP || num_divergent_paths > 1) && m_warpsplit_table.size()>1){
-            std::cout<<"invalidating warpsplit " << warpsplit_id << "branch detected" << std::endl;
+        if ((next_inst_op == BRANCH_OP) && m_warpsplit_table.size()>1){
+
             m_warpsplit_table.invalidate(warpsplit_id);
             return;
         }
 
-        if ((next_inst_op == BRANCH_OP || num_divergent_paths > 1) && m_warpsplit_table.size() == 1){
+        if (next_inst_op == BRANCH_OP && m_warpsplit_table.size() == 1){
             if( !warp_diverged ) {
                 warp_diverged = true;
-                std::cout<<"invalidating warpsplit " << warpsplit_id << "branch detected" << std::endl;
-                std::cout<<"num_divergent_paths " << num_divergent_paths << std::endl;
+                //std::cout<<"invalidating warpsplit " << warpsplit_id << "branch detected" << std::endl;
                 m_warpsplit_table.invalidate(warpsplit_id);
                 if(num_divergent_paths>1){
                     new_recvg_pc = recvg_pc;
@@ -1034,7 +1001,6 @@ void simt_stack::update(int warpsplit_id, simt_mask_t &thread_done, addr_vector_
                     actual_active_mask.set(j);
                 }
             }
-            std::cout<<"actual mask for branch " << actual_active_mask << std::endl;
             m_stack.back().m_active_mask = actual_active_mask;
             m_stack.back().m_pc = tmp_next_pc;
             if (warp_diverged) {
