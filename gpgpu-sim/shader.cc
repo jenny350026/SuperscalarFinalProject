@@ -895,7 +895,7 @@ shd_warp_t* shader_core_ctx::warp(int i, int warpsplit_id){
     if(warpsplit_id == -1)
         return &m_warp[i];
     shd_warp_t *temp = m_warp[i].find_warpsplit(warpsplit_id);
-    assert(temp != NULL);
+    //assert(temp != NULL);
     return temp;
 }
 
@@ -905,7 +905,7 @@ shd_warp_t* scheduler_unit::warp(int i, int warpsplit_id){
     shd_warp_t *temp = (*m_warp)[i].find_warpsplit(warpsplit_id);
     //std::cout<<"looking for warpsplit " << warpsplit_id << std::endl;
     //std::cout<<"found warp split warpId: " << temp->get_warp_id() << " warpsplitID: " << temp->get_warpsplit_id() << std::endl;
-    assert(temp != NULL);
+    //assert(temp != NULL);
     return temp;
 }
 
