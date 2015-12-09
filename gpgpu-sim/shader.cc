@@ -658,6 +658,7 @@ void shader_core_ctx::fetch()
                 std::cout<<"left valid " << (m_warp[warp_id].get_left_warpsplit() && m_simt_stack[warp_id]->warpsplit_is_valid(m_warp[warp_id].get_left_warpsplit()->get_warpsplit_id())) << std::endl;
             }
 */
+            m_last_warpsplit_fetched[warp_id]=(m_last_warpsplit_fetched[warp_id] + 1) %2;
             
             if(m_warp[warp_id].get_right_warpsplit() && m_simt_stack[warp_id]->warpsplit_is_valid(m_warp[warp_id].get_right_warpsplit()->get_warpsplit_id()) && (!m_warp[warp_id].get_left_warpsplit() || m_last_warpsplit_fetched[warp_id] != m_warp[warp_id].get_right_warpsplit()->get_warpsplit_id()) ){
                     //std::cout<<"fetching right"<<std::endl;
@@ -705,18 +706,18 @@ void shader_core_ctx::fetch()
                     enum cache_request_status status = m_L1I->access( (new_addr_type)ppc, mf, gpu_sim_cycle+gpu_tot_sim_cycle,events);
                     if( status == MISS ) {
                         m_last_warp_fetched=warp_id;
-                        m_last_warpsplit_fetched[warp_id]=temp[i]->get_warpsplit_id();
+                        //m_last_warpsplit_fetched[warp_id]=temp[i]->get_warpsplit_id();
                         temp[i]->set_imiss_pending();
                         temp[i]->set_last_fetch(gpu_sim_cycle);
                     } else if( status == HIT ) {
                         m_last_warp_fetched=warp_id;
-                        m_last_warpsplit_fetched[warp_id]=temp[i]->get_warpsplit_id();
+                        //m_last_warpsplit_fetched[warp_id]=temp[i]->get_warpsplit_id();
                         m_inst_fetch_buffer = ifetch_buffer_t(pc,nbytes,warp_id, temp[i]->get_warpsplit_id());
                         temp[i]->set_last_fetch(gpu_sim_cycle);
                         delete mf;
                     } else {
                         m_last_warp_fetched=warp_id;
-                        m_last_warpsplit_fetched[warp_id]=temp[i]->get_warpsplit_id();
+                        //m_last_warpsplit_fetched[warp_id]=temp[i]->get_warpsplit_id();
                         assert( status == RESERVATION_FAIL );
                         delete mf;
                     }
@@ -785,6 +786,42 @@ void shader_core_ctx::issue(){
     for (unsigned i = 0; i < schedulers.size(); i++) {
         schedulers[i]->cycle();
     }
+}
+void shd_warp_t::converge(int count){
+    m_next_pc = left_warpsplit->m_next_pc;
+    n_completed = left_warpsplit->n_completed + right_warpsplit->n_completed;          // number of threads in warp completed
+    m_imiss_pending = false;
+
+    m_inst_at_barrier = NULL;
+    ibuffer_flush();
+    //if(m_warp_id == 4) std::cout<<"converge buffer " << ibuffer_empty() << std::endl;
+    m_next = 0;
+                               
+    m_n_atomic = 0;
+    m_membar = false;
+
+    m_last_fetch = (right_warpsplit->m_last_fetch > left_warpsplit->m_last_fetch)? right_warpsplit->m_last_fetch:left_warpsplit->m_last_fetch;
+
+    m_stores_outstanding = right_warpsplit->m_stores_outstanding + left_warpsplit->m_stores_outstanding;
+    //m_inst_in_pipeline =  count;
+    //m_inst_in_pipeline = right_warpsplit->m_inst_in_pipeline + left_warpsplit->m_inst_in_pipeline - right_warpsplit->m_inst_decoded - left_warpsplit->m_inst_decoded;
+    right_warpsplit->ibuffer_flush();
+    left_warpsplit->ibuffer_flush();
+    m_inst_in_pipeline = right_warpsplit->m_inst_in_pipeline + left_warpsplit->m_inst_in_pipeline;
+    assert(m_inst_in_pipeline >= 0);
+    //std::cout<<"right " << right_warpsplit->m_inst_decoded << std::endl;
+    //std::cout<<"left " << left_warpsplit->m_inst_decoded << std::endl;
+    //std::cout<<"right " << right_warpsplit->m_inst_in_pipeline << std::endl;
+    //std::cout<<"left " << left_warpsplit->m_inst_in_pipeline << std::endl;
+    //std::cout<<"num_in_pipline " << count << std::endl;
+    //if(right_warpsplit == NULL)
+    //    std::cout<<"right is NULL" << std::endl;
+    //if(left_warpsplit == NULL)
+    //    std::cout<<"left is NULL" << std::endl;
+    delete right_warpsplit;
+    right_warpsplit = NULL;
+    delete left_warpsplit;
+    left_warpsplit = NULL;
 }
 
 void shd_warp_t::create_warpsplit(unsigned index1, unsigned index2, std::bitset<MAX_WARP_SIZE> mask){
@@ -939,8 +976,8 @@ void scheduler_unit::cycle()
         unsigned issued=0;
         bool invalidated = false;
         unsigned max_issue = m_shader->m_config->gpgpu_max_insn_issue_per_warp;
-/*
  
+/*
         if(warpsplit_id!=-1){
             std::cout<<"before while warpsplit id != -1"<<std::endl;
             std::cout<<"warp waiting " << warp(warp_id, warpsplit_id).waiting() << std::endl;
@@ -978,12 +1015,14 @@ void scheduler_unit::cycle()
                         ready_inst = true;
                         // TODO change active mask
                         const active_mask_t &active_mask = m_simt_stack[warp_id]->get_active_mask(warpsplit_id);
-                        if(m_shader->get_sid() == 0 && warp_id == 0){
+/*
+                        if(m_shader->get_sid() == 6 && warp_id == 0){
                         std::cout<<"issuing instrution pc " << pI->pc << std::endl;
                         std::cout<<"simt pc " << pc << std::endl;
                         std::cout<<"active_mask "<<active_mask<<std::endl;
                             std::cout<<"warpsplit_id "<<warpsplit_id<<std::endl;
                         }
+*/
 /*
                         if(warp_id == 0){
                             std::cout<<"active_mask "<<active_mask<<std::endl;
@@ -1066,13 +1105,13 @@ void scheduler_unit::cycle()
                         //std::cout<<"m_supervised_warps size before " << (m_supervised_warps).size() << std::endl;
                         //std::cout << "erasing " << (*supervised_iter)->get_warpsplit_id() << std::endl;
                         m_supervised_warps.erase(supervised_iter);
-                        std::cout<<"m_warp size" << (*m_warp).size() << std::endl;
-                        std::cout<<"m_supervised_warps size after" << (m_supervised_warps).size() << std::endl;
+                        //std::cout<<"m_warp size" << (*m_warp).size() << std::endl;
+                        //std::cout<<"m_supervised_warps size after" << (m_supervised_warps).size() << std::endl;
     
                         if(m_simt_stack[warp_id]->warpsplit_table_size() == 0){
                             std::cout << "converging " << warp_id << std::endl;
                             (*m_warp)[warp_id].converge(m_shader->num_in_pipeline(warp_id));
-                            std::cout<<"m_inst_in_pipeline " << (*m_warp)[warp_id].num_inst_in_pipeline() << std::endl;
+                            //std::cout<<"m_inst_in_pipeline " << (*m_warp)[warp_id].num_inst_in_pipeline() << std::endl;
                             m_supervised_warps.push_back(&(*m_warp)[warp_id]);
                             /*
                             std::cout<<"m_supervised_warps size converged" << (m_supervised_warps).size() << std::endl;
@@ -1117,11 +1156,13 @@ void scheduler_unit::cycle()
                             it = supervised_iter;
                     }
             //if(m_shader->get_sid() == 0 && warp_id == 0 && (*m_warp)[warp_id].has_no_warpsplits()){
-            if(m_shader->get_sid() == 0 && warp_id == 0 && it != m_supervised_warps.end() && (*m_warp)[warp_id].has_no_warpsplits()){
+            //if(warp_id == 0 && it != m_supervised_warps.end() && !(*m_warp)[warp_id].done_exit() && (*m_warp)[warp_id].has_no_warpsplits()){
+            if(m_shader->get_sid() == 6 && warp_id == 0 && !(*m_warp)[warp_id].done_exit() && it != m_supervised_warps.end() && (*m_warp)[warp_id].has_no_warpsplits()){
                 std::bitset<MAX_WARP_SIZE> new_mask = std::bitset<MAX_WARP_SIZE>(3);
                 //shd_warp_t* new_warpsplit = new shd_warp_t(m_shader->m_warp[warp_id]);
                 //new_warpsplit->set_dynamic_warp_id(m_shader->m_dynamic_warp_id++);
                 int new_warpsplit_id1 = -1, new_warpsplit_id2 = -1;
+                    //std::cout<<"core " << m_shader->get_sid() << std::endl;
                 m_simt_stack[warp_id]->add_warpsplit(&new_warpsplit_id1, &new_warpsplit_id2, new_mask); 
                 if(new_warpsplit_id1 != -1 && new_warpsplit_id2 != -1){
                     std::cout<<"warp split"<<std::endl;
@@ -3111,6 +3152,13 @@ void shader_core_ctx::get_icnt_power_stats(long &n_simt_to_mem, long &n_mem_to_s
 
 bool shd_warp_t::functional_done() const
 {
+/*
+    if(right_warpsplit && left_warpsplit){
+        std::cout << "right completed " << right_warpsplit->get_n_completed() << std::endl;
+        std::cout << "left completed " << left_warpsplit->get_n_completed() << std::endl;
+        return m_warp_size == right_warpsplit->get_n_completed() + left_warpsplit->get_n_completed();
+    }
+*/
     return get_n_completed() == m_warp_size;
 }
 
@@ -3121,7 +3169,8 @@ bool shd_warp_t::hardware_done() const
     //std::cout << "stores_done " << stores_done() << std::endl;
     //std::cout << "inst_in_pipeline " << m_inst_in_pipeline << std::endl;
     }
-    return functional_done() && stores_done() && !inst_in_pipeline(); 
+    return functional_done();
+    //return functional_done() && stores_done() && !inst_in_pipeline(); 
 }
 
 bool shd_warp_t::waiting() 

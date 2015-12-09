@@ -587,6 +587,8 @@ simt_stack::simt_stack( unsigned wid, unsigned warpSize) : m_warpsplit_table()
 }
 
 void simt_stack::add_warpsplit(int *index1, int *index2, std::bitset<MAX_WARP_SIZE> mask){
+    //std::cout<<"stack size " << m_stack.size() << std::endl;
+    //std::cout<<"tos pc " << m_stack.back().m_pc << std::endl;
     m_warpsplit_table.add_warpsplit(index1, index2, m_stack.back().m_active_mask, mask, m_stack.back().m_pc, m_stack.back().m_pc);
 }
 
@@ -839,6 +841,12 @@ void simt_stack::update(int warpsplit_id, simt_mask_t &thread_done, addr_vector_
 
     if(!m_warpsplit_table.get_mask(warpsplit_id).any()){
         m_warpsplit_table.invalidate(warpsplit_id);
+        if(m_warpsplit_table.size() == 0)
+            m_stack.pop_back();
+    std::cout<<"simt stack" << std::endl;
+    for(unsigned i = 0; i < m_stack.size(); ++i){
+        std::cout << m_stack[i].m_pc << " " << m_stack[i].m_active_mask << " " << m_stack[i].m_recvg_pc << std::endl;
+    }
         return;
     }
 
@@ -894,7 +902,19 @@ void simt_stack::update(int warpsplit_id, simt_mask_t &thread_done, addr_vector_
 
 
     address_type not_taken_pc = next_inst_pc+next_inst_size;
-    assert(num_divergent_paths<=2);
+/*
+    if(num_divergent_paths > 2){
+        top_active_mask = m_warpsplit_table.get_mask(warpsplit_id);
+    for(unsigned i = 0; i < m_stack.size(); ++i){
+        std::cout << m_stack[i].m_pc << " " << m_stack[i].m_active_mask << " " << m_stack[i].m_recvg_pc << std::endl;
+    }
+        std::cout<<"mask " << top_active_mask << std::endl;
+            for (int j = m_warp_size - 1; j >= 0; j--) {
+                std::cout<<"pc " << next_pc[j] << std::endl;
+            }
+    }
+*/
+    //assert(num_divergent_paths<=2);
     if(num_divergent_paths == 2) std::cout<<"num divergent path " << num_divergent_paths << std::endl;
     for(unsigned i=0; i<num_divergent_paths; i++){
     	address_type tmp_next_pc = null_pc;
@@ -1029,7 +1049,7 @@ void simt_stack::update(int warpsplit_id, simt_mask_t &thread_done, addr_vector_
         if(m_warpsplit_table.size() == 0){
             simt_mask_t actual_active_mask;
             for (int j = m_warp_size - 1; j >= 0; j--) {
-                std::cout<<"pc " << next_pc[j] << std::endl;
+                //std::cout<<"pc " << next_pc[j] << std::endl;
                 if (!thread_done.test(j) && tmp_next_pc == next_pc[j]) {
                     actual_active_mask.set(j);
                 }
@@ -1044,7 +1064,7 @@ void simt_stack::update(int warpsplit_id, simt_mask_t &thread_done, addr_vector_
                 m_stack.back().m_recvg_pc = top_recvg_pc;
             }
 
-            std::cout << "loop iteration " << i << " next pc " << tmp_next_pc << " mask " << actual_active_mask << std::endl;
+            //std::cout << "loop iteration " << i << " next pc " << tmp_next_pc << " mask " << actual_active_mask << std::endl;
         }
 
         m_stack.push_back(simt_stack_entry());
@@ -1063,11 +1083,12 @@ void simt_stack::update(int warpsplit_id, simt_mask_t &thread_done, addr_vector_
     }
 */
     
+/*
     std::cout<<"simt stack" << std::endl;
     for(unsigned i = 0; i < m_stack.size(); ++i){
         std::cout << m_stack[i].m_pc << " " << m_stack[i].m_active_mask << " " << m_stack[i].m_recvg_pc << std::endl;
     }
-
+*/
 
     if (warp_diverged) {
         ptx_file_line_stats_add_warp_divergence(top_pc, 1); 

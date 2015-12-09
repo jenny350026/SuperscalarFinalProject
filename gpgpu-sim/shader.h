@@ -134,52 +134,17 @@ public:
     shd_warp_t* get_left_warpsplit() const{
         return left_warpsplit;
     }
-bool has_no_warpsplits(){
+bool has_no_warpsplits() const{
     return left_warpsplit == NULL && right_warpsplit == NULL;
 }
 
-    bool has_warpsplits(){
+    bool has_warpsplits() const {
         return left_warpsplit != NULL || right_warpsplit != NULL;
     }
 
     void create_warpsplit(unsigned index1, unsigned index2, std::bitset<MAX_WARP_SIZE> mask);
     
-    void converge(int count){
-        m_next_pc = left_warpsplit->m_next_pc;
-        n_completed = left_warpsplit->n_completed + right_warpsplit->n_completed;          // number of threads in warp completed
-        m_imiss_pending = false;
-    
-        m_inst_at_barrier = NULL;
-        ibuffer_flush();
-        if(m_warp_id == 4) std::cout<<"converge buffer " << ibuffer_empty() << std::endl;
-        m_next = 0;
-                                   
-        m_n_atomic = 0;
-        m_membar = false;
-
-        m_last_fetch = (right_warpsplit->m_last_fetch > left_warpsplit->m_last_fetch)? right_warpsplit->m_last_fetch:left_warpsplit->m_last_fetch;
-
-        m_stores_outstanding = 0;
-        m_inst_in_pipeline =  count;
-        //m_inst_in_pipeline = right_warpsplit->m_inst_in_pipeline + left_warpsplit->m_inst_in_pipeline - right_warpsplit->m_inst_decoded - left_warpsplit->m_inst_decoded;
-        //right_warpsplit->ibuffer_flush();
-        //left_warpsplit->ibuffer_flush();
-        //m_inst_in_pipeline = right_warpsplit->m_inst_in_pipeline + left_warpsplit->m_inst_in_pipeline;
-        assert(m_inst_in_pipeline >= 0);
-        //std::cout<<"right " << right_warpsplit->m_inst_decoded << std::endl;
-        //std::cout<<"left " << left_warpsplit->m_inst_decoded << std::endl;
-        std::cout<<"right " << right_warpsplit->m_inst_in_pipeline << std::endl;
-        std::cout<<"left " << left_warpsplit->m_inst_in_pipeline << std::endl;
-        std::cout<<"num_in_pipline " << count << std::endl;
-        if(right_warpsplit == NULL)
-            std::cout<<"right is NULL" << std::endl;
-        if(left_warpsplit == NULL)
-            std::cout<<"left is NULL" << std::endl;
-        delete right_warpsplit;
-        right_warpsplit = NULL;
-        delete left_warpsplit;
-        left_warpsplit = NULL;
-    }
+    void converge(int count);
 
     //TODO need a function to change m_active_threads after splitting
     void set_active_threads(std::bitset<MAX_WARP_SIZE> new_mask){
@@ -206,8 +171,8 @@ bool has_no_warpsplits(){
 
     void reset()
     {
-        assert( m_stores_outstanding==0);
-        assert( m_inst_in_pipeline==0);
+        //assert( m_stores_outstanding==0);
+        //assert( m_inst_in_pipeline==0);
         m_imiss_pending=false;
         m_warp_id=(unsigned)-1;
         m_dynamic_warp_id = (unsigned)-1;
@@ -316,7 +281,7 @@ bool has_no_warpsplits(){
     void inc_store_req() { m_stores_outstanding++; }
     void dec_store_req() 
     {
-        assert( m_stores_outstanding > 0 );
+        //assert( m_stores_outstanding > 0 );
         m_stores_outstanding--;
     }
 
