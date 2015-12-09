@@ -160,11 +160,11 @@ bool has_no_warpsplits(){
         m_last_fetch = (right_warpsplit->m_last_fetch > left_warpsplit->m_last_fetch)? right_warpsplit->m_last_fetch:left_warpsplit->m_last_fetch;
 
         m_stores_outstanding = 0;
-        //m_inst_in_pipeline =  count;
+        m_inst_in_pipeline =  count;
         //m_inst_in_pipeline = right_warpsplit->m_inst_in_pipeline + left_warpsplit->m_inst_in_pipeline - right_warpsplit->m_inst_decoded - left_warpsplit->m_inst_decoded;
-        right_warpsplit->ibuffer_flush();
-        left_warpsplit->ibuffer_flush();
-        m_inst_in_pipeline = right_warpsplit->m_inst_in_pipeline + left_warpsplit->m_inst_in_pipeline;
+        //right_warpsplit->ibuffer_flush();
+        //left_warpsplit->ibuffer_flush();
+        //m_inst_in_pipeline = right_warpsplit->m_inst_in_pipeline + left_warpsplit->m_inst_in_pipeline;
         assert(m_inst_in_pipeline >= 0);
         //std::cout<<"right " << right_warpsplit->m_inst_decoded << std::endl;
         //std::cout<<"left " << left_warpsplit->m_inst_decoded << std::endl;
