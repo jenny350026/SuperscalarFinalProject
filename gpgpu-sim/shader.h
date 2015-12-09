@@ -183,6 +183,10 @@ bool has_no_warpsplits() const{
         m_last_fetch=0;
         m_next=0;
         m_inst_at_barrier=NULL;
+        delete right_warpsplit;
+        right_warpsplit = NULL;
+        delete left_warpsplit;
+        left_warpsplit = NULL;
     }
     void init( address_type start_pc,
                unsigned cta_id,
@@ -1788,7 +1792,9 @@ public:
     void set_max_cta( const kernel_info_t &kernel );
     void warp_inst_complete(const warp_inst_t &inst);
     
+    void record_last_hit(unsigned warp_id, std::bitset<MAX_WARP_SIZE> mask);
     // accessors
+    std::bitset<MAX_WARP_SIZE> get_last_hit(unsigned warp_id);
     std::list<unsigned> get_regs_written( const inst_t &fvt ) const;
     const shader_core_config *get_config() const { return m_config; }
     void print_cache_stats( FILE *fp, unsigned& dl1_accesses, unsigned& dl1_misses );
@@ -1980,6 +1986,7 @@ public:
 
     // decode/dispatch
     std::vector<shd_warp_t>   m_warp;   // per warp information array
+    std::vector<std::bitset<MAX_WARP_SIZE>> m_last_hits;
     barrier_set_t             m_barriers;
     ifetch_buffer_t           m_inst_fetch_buffer;
     std::vector<register_set> m_pipeline_reg;
