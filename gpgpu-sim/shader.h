@@ -124,7 +124,7 @@ public:
         if(found_warpsplit(i, &temp))
             return temp;
         else
-            return this;
+            return NULL;
     }
 
     shd_warp_t* get_right_warpsplit() const{
@@ -302,7 +302,7 @@ bool has_no_warpsplits(){
     void inc_inst_in_pipeline() { m_inst_in_pipeline++; }
     void dec_inst_in_pipeline() 
     {
-        std::cout << m_warpsplit_id <<  " m_inst_in_pipeline " << m_inst_in_pipeline << std::endl;
+        if(m_warp_id == 0) std::cout << "warp_id " << m_warp_id << " : " << m_warpsplit_id <<  " m_inst_in_pipeline " << m_inst_in_pipeline << std::endl;
         assert( m_inst_in_pipeline > 0 );
         m_inst_in_pipeline--;
         //if(right_warpsplit)
