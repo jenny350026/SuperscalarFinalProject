@@ -814,13 +814,13 @@ void shd_warp_t::converge(int count){
         //m_inst_in_pipeline = right_warpsplit->m_inst_in_pipeline + left_warpsplit->m_inst_in_pipeline - right_warpsplit->m_inst_decoded - left_warpsplit->m_inst_decoded;
         //right_warpsplit->ibuffer_flush();
         //left_warpsplit->ibuffer_flush();
-        //m_inst_in_pipeline = right_warpsplit->m_inst_in_pipeline + left_warpsplit->m_inst_in_pipeline;
+        m_inst_in_pipeline = right_warpsplit->m_inst_in_pipeline + left_warpsplit->m_inst_in_pipeline;
         //assert(m_inst_in_pipeline >= 0);
         //std::cout<<"right " << right_warpsplit->m_inst_decoded << std::endl;
         //std::cout<<"left " << left_warpsplit->m_inst_decoded << std::endl;
-        std::cout<<"right " << right_warpsplit->m_inst_in_pipeline << std::endl;
-        std::cout<<"left " << left_warpsplit->m_inst_in_pipeline << std::endl;
-        std::cout<<"num_in_pipline " << count << std::endl;
+        //std::cout<<"right " << right_warpsplit->m_inst_in_pipeline << std::endl;
+        //std::cout<<"left " << left_warpsplit->m_inst_in_pipeline << std::endl;
+        //std::cout<<"num_in_pipline " << count << std::endl;
         if(right_warpsplit == NULL)
             std::cout<<"right is NULL" << std::endl;
         if(left_warpsplit == NULL)
@@ -832,13 +832,13 @@ void shd_warp_t::converge(int count){
 
 }
 
-void shd_warp_t::create_warpsplit(unsigned index1, unsigned index2, std::bitset<MAX_WARP_SIZE> mask){
+void shd_warp_t::create_warpsplit(unsigned index1, unsigned index2, std::bitset<MAX_WARP_SIZE> mask, int count){
         m_warpsplit_id = -1;
         left_warpsplit = new shd_warp_t(*this);
         left_warpsplit->m_warpsplit_id = index1;
         left_warpsplit->m_inst_decoded = 0;
         left_warpsplit->ibuffer_flush();
-        left_warpsplit->m_inst_in_pipeline = 0;
+        left_warpsplit->m_inst_in_pipeline = count;
         left_warpsplit->m_imiss_pending = false;
         //std::cout<< "left inst in pipeline " << left_warpsplit->m_inst_in_pipeline << std::endl;
 
@@ -846,10 +846,11 @@ void shd_warp_t::create_warpsplit(unsigned index1, unsigned index2, std::bitset<
         right_warpsplit->m_warpsplit_id = index2;
         right_warpsplit->m_inst_decoded = 0;
         right_warpsplit->ibuffer_flush();
-        right_warpsplit->m_inst_in_pipeline = 0;
+        right_warpsplit->m_inst_in_pipeline = count;
         right_warpsplit->m_imiss_pending = false;
         //std::cout<< "right inst in pipeline " << right_warpsplit->m_inst_in_pipeline << std::endl;
         ibuffer_flush();
+        std::cout<<"num in pipeline " << count << std::endl;
 }
 
 shd_warp_t* shader_core_ctx::warp(int i, int warpsplit_id){
@@ -987,14 +988,12 @@ void scheduler_unit::cycle()
         unsigned issued=0;
         bool invalidated = false;
         unsigned max_issue = m_shader->m_config->gpgpu_max_insn_issue_per_warp;
-/*
  
         if(warpsplit_id!=-1){
             std::cout<<"before while warpsplit id != -1"<<std::endl;
-            std::cout<<"warp waiting " << warp(warp_id, warpsplit_id).waiting() << std::endl;
-            std::cout<<"warp ibuffer empty" << warp(warp_id, warpsplit_id).ibuffer_empty() << std::endl;
+            std::cout<<"warp waiting " << warp(warp_id, warpsplit_id)->waiting() << std::endl;
+            std::cout<<"warp ibuffer empty" << warp(warp_id, warpsplit_id)->ibuffer_empty() << std::endl;
         }
-*/
         //if(warp_id == 4) std::cout<<"buffer empty " << !warp(warp_id, warpsplit_id).ibuffer_empty() << std::endl;
         assert(warp(warp_id, warpsplit_id) != NULL);
        while( !warp(warp_id, warpsplit_id)->waiting() && !warp(warp_id, warpsplit_id)->ibuffer_empty() && (checked < max_issue) && (checked <= issued) && (issued < max_issue) ) {
@@ -1052,7 +1051,7 @@ void scheduler_unit::cycle()
                             std::cout << "final mask " << active_mask << std::endl;
                         }
                         */
-                        //std::cout<<"warp_id " << warp_id << " warpsplit_id " << warpsplit_id << std::endl;
+                        if(warp_id == 0) std::cout<<"scheduler warp_id " << warp_id << " warpsplit_id " << warpsplit_id << std::endl;
                         assert( warp(warp_id, warpsplit_id)->inst_in_pipeline() );
                         if ( (pI->op == LOAD_OP) || (pI->op == STORE_OP) || (pI->op == MEMORY_BARRIER_OP) ) {
                             if( m_mem_out->has_free() ) {
@@ -1166,6 +1165,7 @@ void scheduler_unit::cycle()
                             it = supervised_iter;
                     }
             //if(m_shader->get_sid() == 0 && warp_id == 0 && (*m_warp)[warp_id].has_no_warpsplits()){
+            //if(warp_id == 0 && it != m_supervised_warps.end() && (*m_warp)[warp_id].has_no_warpsplits()){
             if(m_shader->get_sid() == 0 && warp_id == 0 && it != m_supervised_warps.end() && (*m_warp)[warp_id].has_no_warpsplits()){
                 std::bitset<MAX_WARP_SIZE> new_mask = std::bitset<MAX_WARP_SIZE>(3);
                 //shd_warp_t* new_warpsplit = new shd_warp_t(m_shader->m_warp[warp_id]);
@@ -1174,7 +1174,7 @@ void scheduler_unit::cycle()
                 m_simt_stack[warp_id]->add_warpsplit(&new_warpsplit_id1, &new_warpsplit_id2, new_mask); 
                 if(new_warpsplit_id1 != -1 && new_warpsplit_id2 != -1){
                     std::cout<<"warp split"<<std::endl;
-                    (*m_warp)[warp_id].create_warpsplit(new_warpsplit_id1, new_warpsplit_id2, new_mask);
+                    (*m_warp)[warp_id].create_warpsplit(new_warpsplit_id1, new_warpsplit_id2, new_mask, m_shader->num_in_pipeline(warp_id));
                 
                     std::vector< shd_warp_t* >::iterator iter = m_supervised_warps.end();
                     for ( std::vector< shd_warp_t* >::iterator supervised_iter = m_supervised_warps.begin(); supervised_iter != m_supervised_warps.end(); ++supervised_iter){
@@ -3171,7 +3171,8 @@ bool shd_warp_t::hardware_done() const
     //std::cout << "stores_done " << stores_done() << std::endl;
     //std::cout << "inst_in_pipeline " << m_inst_in_pipeline << std::endl;
     }
-    return functional_done() && stores_done() && !inst_in_pipeline(); 
+    //return functional_done() && stores_done() && !inst_in_pipeline(); 
+    return functional_done() && stores_done();
 }
 
 bool shd_warp_t::waiting() 

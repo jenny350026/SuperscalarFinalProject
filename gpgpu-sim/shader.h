@@ -142,7 +142,7 @@ bool has_no_warpsplits(){
         return left_warpsplit != NULL || right_warpsplit != NULL;
     }
 
-    void create_warpsplit(unsigned index1, unsigned index2, std::bitset<MAX_WARP_SIZE> mask);
+    void create_warpsplit(unsigned index1, unsigned index2, std::bitset<MAX_WARP_SIZE> mask, int count);
     
     void converge(int count);
 
