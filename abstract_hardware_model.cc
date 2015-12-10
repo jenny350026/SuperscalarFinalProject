@@ -606,6 +606,7 @@ void simt_stack::reset()
 {
     m_stack.clear();
     m_warpsplit_table.reset();
+    //std::cout<<"simt stack reset"<< std::endl;
 }
 
 void simt_stack::launch( address_type start_pc, const simt_mask_t &active_mask )
@@ -1116,6 +1117,7 @@ void simt_stack::update(int warpsplit_id, simt_mask_t &thread_done, addr_vector_
     m_stack.pop_back();
     if(m_stack.size() == 0){
             bool all_done = true;
+            std::cout<<"simt stack sid " << m_sid << " warp id " << warp_id <<   std::endl;
             for (int j = m_warp_size - 1; j >= 0; j--) {
                 std::cout<<"pc " << next_pc[j] << std::endl;
                 if(next_pc[j] != (unsigned) -1)
@@ -1138,7 +1140,8 @@ void simt_stack::update(int warpsplit_id, simt_mask_t &thread_done, addr_vector_
     }
 */
     
-    if(m_sid == 1 && warp_id == 35){
+    //if(m_sid == 1 && warp_id == 35){
+    if(m_stack.size() == 0){
         std::cout<<"simt stack sid " << m_sid << " warp id " << warp_id <<   std::endl;
         for(unsigned i = 0; i < m_stack.size(); ++i){
             std::cout << m_stack[i].m_pc << " " << m_stack[i].m_active_mask << " " << m_stack[i].m_recvg_pc << std::endl;

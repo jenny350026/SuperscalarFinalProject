@@ -187,6 +187,7 @@ bool has_no_warpsplits() const{
         right_warpsplit = NULL;
         delete left_warpsplit;
         left_warpsplit = NULL;
+        //std::cout << "shd_warp_t reset" << std::endl;
     }
     void init( address_type start_pc,
                unsigned cta_id,
@@ -1560,6 +1561,10 @@ struct shader_core_stats_pod {
     unsigned *last_shader_cycle_distro;
     unsigned *num_warps_issuable;
     unsigned gpgpu_n_stall_shd_mem;
+
+    unsigned m_total_warpsplit_cycle;
+    unsigned m_num_warpsplit;
+    unsigned m_total_warpsplit_inst;
 
     //memory access classification
     int gpgpu_n_mem_read_local;

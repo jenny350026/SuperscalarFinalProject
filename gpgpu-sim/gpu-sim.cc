@@ -894,7 +894,9 @@ void gpgpu_sim::gpu_print_stat()
    printf("gpu_tot_ipc = %12.4f\n", (float)(gpu_tot_sim_insn+gpu_sim_insn) / (gpu_tot_sim_cycle+gpu_sim_cycle));
    printf("gpu_tot_issued_cta = %lld\n", gpu_tot_issued_cta);
 
-
+   printf("tot_warpsplit_cycle = %lld\n", m_shader_stats->m_total_warpsplit_cycle); 
+   printf("tot_warpsplit_inst = %lld\n", m_shader_stats->m_total_warpsplit_inst); 
+   printf("num_warpsplit = %lld\n", m_shader_stats->m_num_warpsplit); 
 
    // performance counter for stalls due to congestion.
    printf("gpu_stall_dramfull = %d\n", gpu_stall_dramfull);
